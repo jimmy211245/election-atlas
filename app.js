@@ -104,7 +104,14 @@
 
   /* ---------------- Data helpers ---------------- */
   const mainEl = c => c.el[c.main || 0];
-  const shortName = n => { const parts = n.split(' '); return parts.length > 1 ? parts[parts.length - 1] : n; };
+  // Short candidate names: usually the last word, except for compound surnames and East Asian name order
+  const SHORT = {
+    'Luiz Inácio Lula da Silva': 'Lula', 'Andrés Manuel López Obrador': 'López Obrador', 'Enrique Peña Nieto': 'Peña Nieto', 'Josefina Vázquez Mota': 'Vázquez Mota',
+    'Jaime Rodríguez Calderón': 'Rodríguez', 'Jorge Álvarez Máynez': 'Álvarez Máynez', 'Robert F. Kennedy Jr.': 'Kennedy', 'Lee Jae-myung': 'Lee', 'Kim Moon-soo': 'Kim',
+    'Lee Jun-seok': 'Lee', 'Moon Jae-in': 'Moon', 'Yoon Suk Yeol': 'Yoon', 'Hong Joon-pyo': 'Hong', 'Ahn Cheol-soo': 'Ahn', 'Luís Marques Mendes': 'Marques Mendes',
+    'Henrique Gouveia e Melo': 'Gouveia e Melo', 'João Cotrim de Figueiredo': 'Cotrim de Figueiredo', 'Marcelo Rebelo de Sousa': 'Rebelo de Sousa', 'Cabo Daciolo': 'Daciolo'
+  };
+  const shortName = n => { if (SHORT[n]) return SHORT[n]; const parts = n.split(' '); return parts.length > 1 ? parts[parts.length - 1] : n; };
 
   function winnerOf(e) {
     if (e.k === 'pres') {
@@ -168,7 +175,7 @@
           legendTitle: ['Largest party by second votes per constituency', 'Stärkste Partei nach Zweitstimmen je Wahlkreis'] },
         { id: 'land', label: ['States', 'Bundesländer'], short: ['States', 'Bundesländer'], unit: ['States', 'Länder'], obj: 'land', mm: 20, maxZoom: 12,
           key: f => f.properties.land,
-          rec: (D, k) => { const x = D.land[k]; if (!x) return null; return { name: landName(k), label: tr('State · second votes', 'Bundesland · Zweitstimmen'), r: x.z, to: x.to, alt: { label: tr('First votes', 'Erststimmen'), r: x.e } }; },
+          rec: (D, k) => { const x = D.land[k]; if (!x) return null; return { name: landName(k), label: tr('State · second votes', 'Bundesland · Zweitstimmen'), r: x.z, to: x.to, alt: x.e ? { label: tr('First votes', 'Erststimmen'), r: x.e } : null }; },
           legendTitle: ['Largest party by second votes per state', 'Stärkste Partei nach Zweitstimmen je Bundesland'] }
       ]
     },
@@ -177,12 +184,13 @@
       layers: [
         { id: 'states', label: ['States', 'Bundesstaaten'], short: ['States', 'Bundesstaaten'], unit: ['States', 'Staaten'], obj: 'states', mm: 30, maxZoom: 14, el: 0,
           key: f => f.id,
-          rec: (D, k) => {
+          rec: (D, k, f, c) => {
             const x = D.states[k]; if (!x) return null;
-            const ev = x.ev, evTxt = ev.rep && ev.dem ? `Trump ${ev.rep}, Harris ${ev.dem}` : (ev.rep ? `${ev.rep} ${tr('to', 'an')} Trump` : `${ev.dem} ${tr('to', 'an')} Harris`);
+            const R = subParty(c, null, 'rep').short, Dm = subParty(c, null, 'dem').short;
+            const ev = x.ev, evTxt = ev.rep && ev.dem ? `${R} ${ev.rep}, ${Dm} ${ev.dem}` : (ev.rep ? `${ev.rep} ${tr('to', 'an')} ${R}` : `${ev.dem} ${tr('to', 'an')} ${Dm}`);
             const rows = [[tr('Electoral votes', 'Wahlleute'), evTxt], [tr('Total votes', 'Stimmen gesamt'), int(x.tot)]];
             if (x.dist) for (const [dk, dv] of Object.entries(x.dist)) rows.push([dk, `${dv.r[0][0] === 'rep' ? 'Trump' : 'Harris'} ${pct(dv.r[0][1])}`]);
-            return { name: x.n, label: tr('State', 'Bundesstaat'), r: x.r.map(a => [a[0], a[1]]), rows, evWeight: ev.rep + ev.dem };
+            return { name: x.n, label: tr('State', 'Bundesstaat'), r: x.r.map(a => [a[0], a[1]]), rows, ev, evWeight: ev.rep + ev.dem };
           },
           legendTitle: ['Winner by state (electoral votes)', 'Gewinner je Bundesstaat (Wahlleute)'], countBy: 'ev' },
         { id: 'counties', label: 'Counties', short: 'Counties', unit: 'Counties', obj: 'counties', overlay: 'states', mm: 50, maxZoom: 40, el: 0,
@@ -216,9 +224,9 @@
     BRA: {
       parties: { pl: ['F. Bolsonaro', 'Flávio Bolsonaro (PL)', '#1F5AA6'], pt: ['Lula', 'Luiz Inácio Lula da Silva (PT)', '#E20E28'] },
       layers: [
-        { id: 'st', label: ['States · 1st round', 'Bundesstaaten · 1. Wahlgang'], short: ['States', 'Bundesstaaten'], unit: ['States', 'Bundesstaaten'], obj: 'bra', mm: 40, maxZoom: 14, el: 0,
+        { id: 'st', label: ['States', 'Bundesstaaten'], short: ['States', 'Bundesstaaten'], unit: ['States', 'Bundesstaaten'], obj: 'bra', mm: 40, maxZoom: 14, el: 0,
           key: f => f.properties.nm,
-          rec: (D, k) => { const x = D.st[k]; if (!x) return null; return { name: x.n, label: tr('State · 1st round', 'Bundesstaat · 1. Wahlgang'), r: x.r }; },
+          rec: (D, k) => { const x = D.st[k]; if (!x) return null; return { name: x.n, label: DV.yrEl ? tr('State · runoff', 'Bundesstaat · Stichwahl') : tr('State · 1st round', 'Bundesstaat · 1. Wahlgang'), r: x.r }; },
           legendTitle: ['First place by state', 'Erstplatzierter je Bundesstaat'] }
       ]
     },
@@ -232,9 +240,9 @@
     },
     POL: {
       layers: [
-        { id: 'st', label: ['Voivodeships · 2025 presidential runoff', 'Woiwodschaften · Präsidenten-Stichwahl 2025'], short: ['Voivodeships', 'Woiwodschaften'], unit: ['Voivodeships', 'Woiwodschaften'], obj: 'pol', mm: 30, maxZoom: 10, el: 1,
+        { id: 'st', label: ['Voivodeships · presidential runoff', 'Woiwodschaften · Präsidenten-Stichwahl'], short: ['Voivodeships', 'Woiwodschaften'], unit: ['Voivodeships', 'Woiwodschaften'], obj: 'pol', mm: 30, maxZoom: 10, el: 1,
           key: f => f.properties.nm,
-          rec: (D, k) => { const x = D.st[k]; if (!x) return null; return { name: x.n, label: tr('Voivodeship · runoff of 1 June 2025', 'Woiwodschaft · Stichwahl 1. Juni 2025'), r: x.r }; },
+          rec: (D, k) => { const x = D.st[k]; if (!x) return null; return { name: x.n, label: tr('Voivodeship · presidential runoff', 'Woiwodschaft · Präsidenten-Stichwahl'), r: x.r }; },
           legendTitle: ['Presidential runoff winner by voivodeship', 'Sieger der Präsidenten-Stichwahl je Woiwodschaft'] }
       ]
     },
@@ -258,12 +266,52 @@
   };
 
   function subParty(c, L, id) {
+    if (DV.yrEl && DV.c === c) {                               // earlier election on the map: its own candidates/parties
+      const p = partyIn(DV.yrEl, id); if (p) return p;
+      if (id === 'sonst' || id === 'oth') return { id, short: tr('Others', 'Sonstige'), name: tr('Other parties', 'Sonstige Parteien'), color: '#A3A3A3' };
+    }
     const def = SUBDEF[c.code];
     if (def && def.parties && def.parties[id]) { const p = def.parties[id]; return { id, short: tr(p[0], p[4] || p[0]), name: tr(p[1], p[3] || p[1]), color: p[2] }; }
     return partyOf(c, id, L && L.el != null ? L.el : null) || { id, short: id, name: id, color: '#A3A3A3' };
   }
+  /* ---------------- Regional maps for earlier elections ---------------- */
+  const LAYER_DATA = { wk1: 'wk', wk2: 'wk', land: 'land', states: 'states', counties: 'counties', pcon: 'pcon', prov: 'prov', st: 'st' };
+  const SUBH = ['USA', 'DEU', 'AUT', 'CAN', 'POL', 'BRA', 'MEX'];   // countries with data/h-XXX.js
+  const subhTried = {};
+  // The earlier election the regional map should show, or null for the latest one
+  function mapYear(c) {
+    const def = SUBDEF[c.sub]; if (!def || !S.yr) return null;
+    const li = def.layers[0].el != null ? def.layers[0].el : 0;
+    if (S.el !== li || !c.el[li]) return null;
+    const e = bodyList(c, c.el[li])[S.yr]; return e && e.hist ? e : null;
+  }
+  function mapData(c) {
+    const base = window.WAHL_SUB[c.sub], e = mapYear(c);
+    if (!e) return { D: base, e: null };
+    const H = window.WAHL_SUBH && window.WAHL_SUBH[c.sub] && window.WAHL_SUBH[c.sub][e.d];
+    return { D: Object.assign({ geo: base.geo }, H || {}), e, none: !H };
+  }
+  const layerOk = (L, D) => !!(D && D[LAYER_DATA[L.id]]);
+  function effLayer(def, D) {
+    const want = def.layers.find(l => l.id === S.layer) || def.layers[0];
+    return layerOk(want, D) ? want : (def.layers.find(l => layerOk(l, D)) || want);
+  }
+  async function syncMapYear() {
+    if (!S.country || !DV.def || DV.c !== C[S.country] || !mapEl.classList.contains('is-detail')) return;
+    const c = DV.c, e = mapYear(c), key = e ? e.d : null;
+    if (key === DV.yrKey) return;
+    if (e && SUBH.includes(c.sub) && !(window.WAHL_SUBH && window.WAHL_SUBH[c.sub]) && !subhTried[c.sub]) {
+      subhTried[c.sub] = true; showLoading(true);
+      try { await loadScript('data/h-' + c.sub + '.js'); } catch (err) { console.error(err); }
+      showLoading(false);
+      if (DV.c !== C[S.country]) return;
+      const e2 = mapYear(c); if ((e2 ? e2.d : null) !== key) return syncMapYear();
+    }
+    drawLayer(); recolorDetail(); renderLegend(); renderCrumb(); rerender();
+  }
   function normRec(c, L, f) {
-    const D = window.WAHL_SUB[c.sub]; const k = L.key(f); const x = L.rec(D, k, f, c);
+    const D = DV.data || window.WAHL_SUB[c.sub]; if (!D[LAYER_DATA[L.id]]) return null;
+    const k = L.key(f); const x = L.rec(D, k, f, c);
     if (!x) return null;
     x.key = k;
     if (LANG === 'de' && REGION_DE[x.name]) x.name = REGION_DE[x.name];
@@ -422,7 +470,7 @@
     const r = mapEl.getBoundingClientRect(); const w = Math.max(200, r.width), h = Math.max(200, r.height);
     Object.assign(DV, { w, h, c, k: 1 });
     detailSvg.attr('viewBox', [0, 0, w, h]);
-    const def = c.sub ? SUBDEF[c.sub] : null; DV.def = def;
+    const def = c.sub ? SUBDEF[c.sub] : null; DV.def = def; DV.yrEl = null; DV.yrKey = null; DV.data = null; DV.noData = false;
     const D = def ? window.WAHL_SUB[c.sub] : null; DV.D = D;
     const feat = WV.byIso.get(c.iso);
     const isUS = c.code === 'USA';
@@ -453,7 +501,7 @@
     } else DV.ctx = null;
     DV.main = DV.root.append('g');
     if (def) drawLayer(); else drawWhole(feat);
-    const maxK = def ? (def.layers.find(l => l.id === S.layer) || def.layers[0]).maxZoom || 16 : 10;
+    const maxK = def ? (DV.L || def.layers[0]).maxZoom || 16 : 10;
     DV.zoom = d3.zoom().scaleExtent([1, maxK]).extent([[0, 0], [w, h]]).translateExtent([[0, 0], [w, h]])
       .on('zoom', ev => { DV.root.attr('transform', ev.transform); DV.k = ev.transform.k; })
       .on('start', hideTip);
@@ -471,9 +519,11 @@
   }
 
   function drawLayer() {
-    const c = DV.c, def = DV.def, D = DV.D;
-    const L = def.layers.find(l => l.id === S.layer) || def.layers[0];
-    DV.L = L; S.layer = L.id;
+    const c = DV.c, def = DV.def;
+    const M = mapData(c), D = M.D;
+    DV.data = D; DV.yrEl = M.e; DV.yrKey = M.e ? M.e.d : null; DV.noData = !!M.none;
+    const L = effLayer(def, D);
+    DV.L = L; if (!S.layer) S.layer = L.id;
     DV.main.selectAll('*').remove();
     const fs = feats(D.geo, L.obj);
     DV.recs = new Map();
@@ -488,8 +538,8 @@
     DV.main.append('path').attr('class', 'outline').attr('d', DV.path(topojson.mesh(D.geo, D.geo.objects[L.obj], (a, b) => a === b)));
     DV.sel = DV.main.append('path').attr('class', 'sel');
     if (S.region) {
-      const f = fs.find(x => L.key(x) === S.region.key);
-      if (f) DV.sel.attr('d', DV.path(f)); else S.region = null;
+      const f = fs.find(x => L.key(x) === S.region.key), rec = f ? DV.recs.get(S.region.key) : null;
+      if (rec) { DV.sel.attr('d', DV.path(f)); S.region.rec = rec; } else S.region = null;
     }
   }
 
@@ -515,9 +565,8 @@
   function setLayer(id) {
     if (!DV.def) return;
     S.layer = id; S.region = null;
-    const L = DV.def.layers.find(l => l.id === id);
-    DV.zoom.scaleExtent([1, L.maxZoom || 16]);
-    drawLayer(); recolorDetail(); renderLegend(); renderPanel(); renderCrumb();
+    drawLayer();
+    DV.zoom.scaleExtent([1, DV.L.maxZoom || 16]); recolorDetail(); renderLegend(); renderPanel(); renderCrumb();
   }
 
   /* ================================================================
@@ -585,9 +634,18 @@
       legend.innerHTML = `<p class="legend-t">${S.mode === 'win' ? tr('Election winner', 'Wahlsieger') : tr('Governing party', 'Regierungspartei')}</p><div class="lg-items"><span><i class="sw" style="background:${col}"></i>${esc(lab.short)}</span></div><p class="legend-s">${tr('No regional results are available for this country. Neighbouring countries are shown faded in their own colour.', 'Für dieses Land sind keine regionalen Ergebnisse hinterlegt. Nachbarländer blass in ihrer Farbe.')}</p>`;
       return;
     }
+    const yr = DV.yrEl ? DV.yrEl.d.slice(0, 4) : '';
+    if (DV.noData) {
+      legend.innerHTML = `<p class="legend-t">${esc(tx(DV.L.legendTitle))} · ${yr}</p><p class="legend-s">${tr('No regional results are available for this election.', 'Für diese Wahl liegen keine regionalen Ergebnisse vor.')}</p>`;
+      return;
+    }
     const L = DV.L, counts = new Map();
     for (const rec of DV.recs.values()) {
       if (!rec || !rec.w || rec.fallback) continue;
+      if (L.countBy === 'ev' && rec.ev) {                        // split states (Maine, Nebraska) count for both sides
+        for (const [p, v] of Object.entries(rec.ev)) if (v) counts.set(p, (counts.get(p) || 0) + v);
+        continue;
+      }
       const add = L.countBy === 'ev' ? (rec.evWeight || 0) : 1;
       counts.set(rec.w, (counts.get(rec.w) || 0) + add);
     }
@@ -598,14 +656,15 @@
     const items = shown.map(([id, n]) => { const p = subParty(c, L, id); return `<span><i class="sw" style="background:${pc(p.color)}"></i>${esc(p.short)} <b class="num">${n}</b></span>`; }).join('')
       + (rest.length ? `<span title="${esc(rest.map(([id, n]) => subParty(c, L, id).short + ' ' + n).join(', '))}">+ ${rest.length} ${tr('more', 'weitere')} (${rest.reduce((s, x) => s + x[1], 0)})</span>` : '');
     const ramp = S.shade ? `<div class="ramp"><span>${tr('narrow', 'knapp')}</span><i style="background:linear-gradient(90deg, ${shadeOf('#777777', 0.34)}, ${pc('#777777')})"></i><span>${tr('clear', 'deutlich')}</span></div>` : '';
-    legend.innerHTML = `<p class="legend-t">${esc(tx(L.legendTitle))}${L.countBy === 'ev' ? tr(' · electoral votes', ' · Wahlleute') : ''}</p><div class="lg-items">${items}</div>${ramp}`;
+    legend.innerHTML = `<p class="legend-t">${esc(tx(L.legendTitle))}${yr ? ' · ' + yr : ''}</p><div class="lg-items">${items}</div>${ramp}`;
   }
 
   function renderCrumb() {
     if (!S.country) { crumb.hidden = true; return; }
     const c = C[S.country];
-    const L = c.sub && SUBDEF[c.sub] ? (SUBDEF[c.sub].layers.find(l => l.id === S.layer) || SUBDEF[c.sub].layers[0]) : null;
-    document.getElementById('crumb-t').textContent = c.n + (L ? ' · ' + tx(L.short) : '');
+    const cur = DV.c === c && DV.L;
+    const L = cur ? DV.L : c.sub && SUBDEF[c.sub] ? (SUBDEF[c.sub].layers.find(l => l.id === S.layer) || SUBDEF[c.sub].layers[0]) : null;
+    document.getElementById('crumb-t').textContent = c.n + (L ? ' · ' + tx(L.short) : '') + (cur && DV.yrEl ? ' · ' + DV.yrEl.d.slice(0, 4) : '');
     crumb.hidden = false;
   }
 
@@ -913,13 +972,23 @@
 
   function layersHTML(c) {
     if (!c.sub || !SUBDEF[c.sub]) return `<section class="sec"><p class="eyebrow">${tr('Map', 'Karte')}</p><p class="note">${tr(`No regional results are available for ${esc(c.n)}. The map shows the country in the winner’s colour and its neighbours faded.`, `Für ${esc(c.n)} sind keine regionalen Ergebnisse hinterlegt. Die Karte zeigt das Land in der Farbe des Wahlsiegers, die Nachbarländer blass.`)}</p></section>`;
-    const def = SUBDEF[c.sub];
-    const seg = def.layers.length > 1 ? `<div class="seg" role="group" aria-label="${tr('Map layer', 'Kartenebene')}">${def.layers.map(l => `<button type="button" id="ly-${l.id}" data-layer="${l.id}" aria-pressed="${l.id === S.layer}">${esc(tx(l.label))}</button>`).join('')}</div>` : `<p class="note"><b style="color:var(--ink)">${esc(tx(def.layers[0].label))}</b></p>`;
+    const def = SUBDEF[c.sub], live = DV.c === c && DV.L, cur = live ? DV.L.id : S.layer;
+    const off = l => live && !DV.noData && !layerOk(l, DV.data);
+    const seg = def.layers.length > 1 ? `<div class="seg" role="group" aria-label="${tr('Map layer', 'Kartenebene')}">${def.layers.map(l => `<button type="button" id="ly-${l.id}" data-layer="${l.id}" aria-pressed="${l.id === cur}"${off(l) ? ` disabled title="${tr('Not available for this election', 'Für diese Wahl nicht verfügbar')}"` : ''}>${esc(tx(l.label))}</button>`).join('')}</div>` : `<p class="note"><b style="color:var(--ink)">${esc(tx(def.layers[0].label))}</b></p>`;
     return `<section class="sec layers"><p class="eyebrow" style="margin:0">${tr('Regional map', 'Regionale Karte')}</p>${seg}
       <label class="switch"><input type="checkbox" id="shade" ${S.shade ? 'checked' : ''}> ${tr('Fade narrow results', 'Knappe Ergebnisse blasser zeigen')}</label>
-      <p class="note">${tr('Click an area on the map for details. Zoom with the mouse wheel or two fingers.', 'Gebiet auf der Karte anklicken für Details. Mit Mausrad oder zwei Fingern zoomen.')}${S.yr > 0 ? tr(' The regional map always shows the latest election.', ' Die regionale Karte zeigt immer die aktuelle Wahl.') : ''}</p></section>`;
+      <p class="note">${tr('Click an area on the map for details. Zoom with the mouse wheel or two fingers.', 'Gebiet auf der Karte anklicken für Details. Mit Mausrad oder zwei Fingern zoomen.')}${yrNote(c, def)}</p></section>`;
   }
 
+  function yrNote(c, def) {
+    if (!S.yr) return '';
+    const live = DV.c === c && DV.L, e = live ? DV.yrEl : mapYear(c);
+    if (!e) return tr(' The regional map shows the latest election.', ' Die regionale Karte zeigt die aktuelle Wahl.');
+    const y = e.d.slice(0, 4);
+    if (live && DV.noData) return tr(` No regional results are available for the ${y} election, so the map is greyed out.`, ` Für die Wahl ${y} liegen keine regionalen Ergebnisse vor, die Karte ist daher grau.`);
+    const some = live && def.layers.some(l => !layerOk(l, DV.data));
+    return tr(` The map shows the ${y} election.`, ` Die Karte zeigt die Wahl ${y}.`) + (some ? tr(' Some map layers are only available for the latest election.', ' Manche Kartenebenen gibt es nur für die aktuelle Wahl.') : '');
+  }
   function regionCardHTML(c) {
     const def = SUBDEF[c.sub]; if (!def || !DV.L) return '';
     const L = DV.L, rec = S.region.rec;
@@ -949,14 +1018,14 @@
   function rerender() { const top = panel.scrollTop; renderPanel(); panel.scrollTop = top; }
   panel.addEventListener('click', ev => {
     const yEl = ev.target.closest('[data-yr]');
-    if (yEl) { S.yr = +yEl.dataset.yr; rerender(); return; }
+    if (yEl) { S.yr = +yEl.dataset.yr; rerender(); syncMapYear(); return; }
     const mEl = ev.target.closest('[data-metric]');
     if (mEl) { S.metric = mEl.dataset.metric; rerender(); return; }
     const t = ev.target.closest('button, input'); if (!t) return;
     if (t.dataset.open) { openCountry(t.dataset.open); return; }
     if (t.id === 'close') { closeCountry(); return; }
     if (t.id === 'rclose') { clearRegion(); return; }
-    if (t.dataset.el != null) { S.el = +t.dataset.el; S.yr = 0; renderPanel(); return; }
+    if (t.dataset.el != null) { S.el = +t.dataset.el; S.yr = 0; renderPanel(); syncMapYear(); return; }
     if (t.dataset.layer) { setLayer(t.dataset.layer); return; }
     if (t.id === 'shade') { S.shade = t.checked; try { localStorage.setItem('wahlatlas-shade', S.shade ? '1' : '0'); } catch (e) { /* ignore */ } recolorDetail(); renderLegend(); }
   });
