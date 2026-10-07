@@ -27,6 +27,15 @@ window.WAHL_DE = {
     next: 'Bundestagswahl spätestens 2029', sub: 'DEU',
     el: [{
       t: 'Bundestagswahl 2025', d: '2025-02-23', k: 'parl', ch: 'Bundestag', seats: 630, to: 82.5, vl: 'Zweitstimmen',
+      src: {
+        checked: '2026-10-06',
+        origin: { t: 'Bei der Erfassung der Gesamtzahlen wurde keine Einzelquelle festgehalten. Die Regionalkarten nutzen die amtlichen Open-Data-Dateien der Bundeswahlleiterin (kerg2.csv, unten verlinkt).' },
+        official: [
+          { t: 'Bundeswahlleiterin: Bundestagswahl 2025, Ergebnis im Bund', u: 'https://www.bundeswahlleiterin.de/bundestagswahlen/2025/ergebnisse/bund-99.html', v: 'Die Seite ist als „Endgültiges Ergebnis“ gekennzeichnet. Bestätigt Wahlbeteiligung (82,5 %) und Sitzverteilung (630 Sitze; gespeichert CDU/CSU 208 = CDU 164 + CSU 44).' },
+          { t: 'Bundeswahlleiterin: Open-Data-Datei kerg2.csv („Amtliches Endergebnis“)', u: 'https://www.bundeswahlleiterin.de/bundestagswahlen/2025/ergebnisse/opendata/btw25/csv/kerg2.csv', v: 'Die Zweitstimmenanteile aller neun gespeicherten Parteien stimmen auf zwei Nachkommastellen überein (verglichen am 6. Okt. 2026).' }
+        ],
+        note: 'Keine Abweichungen gefunden. Nicht durch diese Quellen belegt: die Sitzänderungen gegenüber 2021.'
+      },
       note: 'CDU 22,6 % · CSU 6,0 %. BSW (4,98 %) und FDP scheiterten an der Fünf-Prozent-Hürde. 23 Wahlkreissieger erhielten wegen der Zweitstimmendeckung kein Mandat.',
       p: [
         ['linke', 'Linke', 'Die Linke', '#BE3075', 8.77, 64, 25],
@@ -388,15 +397,24 @@ window.WAHL_DE = {
     next: 'Regierungsbildung läuft',
     el: [{
       t: 'Saeima-Wahl 2026', d: '2026-10-03', k: 'parl', ch: 'Saeima', seats: 100, to: 51.8, prelim: true,
-      note: 'Wahl vor drei Tagen; Ergebnis vorläufig. Die Union der Grünen und Bauern (ZZS) verpasste den Wiedereinzug.',
+      pbase: 'Anteile wie von der CVK ausgewiesen: Prozent der 804.501 gültigen Wahlumschläge. Die sieben Listen unter 5 % erreichten zusammen 11,06 %; 1,32 % der Umschläge (10.655) sind keiner Liste zugeordnet. Die Anteile ergeben daher nicht 100 %.',
+      src: {
+        checked: '2026-10-06',
+        origin: { t: 'Stimmenanteile: von der unten verlinkten CVK-Ergebnisseite übernommen (provisorische Ergebnisse; Prozent der gültigen Wahlumschläge). Sitze und Beteiligung stimmen mit der CVK überein. Die Sitzänderungen gegenüber 2022 und die Listennamen stammen aus der englischen Wikipedia und wurden nicht gegen die CVK geprüft.', l: 'Wikipedia (EN): Saeima-Wahl 2026 (2026 Latvian parliamentary election)', u: 'https://en.wikipedia.org/wiki/2026_Latvian_parliamentary_election' },
+        official: [
+          { t: 'Zentrale Wahlkommission (CVK): 15. Saeima-Wahl – Ergebnisse', u: 'https://www.cvk.lv/saeima-2026-rezultati', v: 'Die Seite ist mit „Provisorische Ergebnisse“ überschrieben (zuletzt aktualisiert am 5. Okt. 2026, 12:23 Uhr). Quelle der gespeicherten Stimmenanteile: die dort veröffentlichten Prozentwerte, bezogen auf die 804.501 gültigen Wahlumschläge (Beispiel: Vereinigte Liste, 283.892 Stimmen = 35,288 %). Alle Sitze (41, 17, 15, 10, 10, 7 und 0) und die Beteiligung (51,8 %: 806.641 von 1.557.615) stimmen mit den gespeicherten Werten überein; die sieben gespeicherten Anteile entsprechen den veröffentlichten (verglichen am 6. Okt. 2026).' }
+        ],
+        note: 'Nicht durch die CVK-Seite belegt: die Sitzänderungen gegenüber 2022. Das Ergebnis ist provisorisch, wie von der CVK gekennzeichnet.'
+      },
+      note: 'Wahl am 3. Oktober 2026; Ergebnis vorläufig. Die Union der Grünen und Bauern (ZZS) verpasste den Wiedereinzug.',
       p: [
-        ['pro', 'PRO', 'Die Progressiven', '#E85A8C', 7.98, 10, 0],
-        ['jv', 'JV', 'Neue Einheit', '#6AB647', 6.45, 7, -19],
-        ['zzs', 'ZZS', 'Union der Grünen und Bauern', '#02723A', 4.46, 0, -16],
-        ['as', 'AS', 'Vereinigte Liste', '#F29A00', 35.76, 41, 26],
-        ['lpv', 'LPV', 'Lettland zuerst', '#A8343C', 13.25, 17, 8],
-        ['sv', 'SV/AJ', 'Souveräne Macht / Allianz junger Letten', '#6A5ACD', 11.87, 15, 'neu'],
-        ['na', 'NA', 'Nationale Allianz', '#5C1A1A', 9.02, 10, -3]
+        ['pro', 'PRO', 'Die Progressiven', '#E85A8C', 7.878, 10, 0],
+        ['jv', 'JV', 'Neue Einheit', '#6AB647', 6.362, 7, -19],
+        ['zzs', 'ZZS', 'Union der Grünen und Bauern', '#02723A', 4.401, 0, -16],
+        ['as', 'AS', 'Vereinigte Liste', '#F29A00', 35.288, 41, 26],
+        ['lpv', 'LPV', 'Lettland zuerst', '#A8343C', 13.076, 17, 8],
+        ['sv', 'SV/AJ', 'Souveräne Macht / Allianz junger Letten', '#6A5ACD', 11.710, 15, 'neu'],
+        ['na', 'NA', 'Nationale Allianz', '#5C1A1A', 8.897, 10, -3]
       ]
     }]
   },
@@ -817,6 +835,15 @@ window.WAHL_DE = {
     focus: [[-125, 24.4], [-66.9, 49.4]],
     el: [{
       t: 'Präsidentschaftswahl 2024', d: '2024-11-05', k: 'pres', to: 63.9, ev: { rep: 312, dem: 226 },
+      src: {
+        checked: '2026-10-06',
+        origin: { t: 'Englische Wikipedia, 2024 United States presidential election, Tabelle „Results by state“ (Gesamtzeile). Die Staaten- und County-Ergebnisse stammen aus dieser Tabelle und aus einem County-Datensatz (tonmcg).', l: 'Wikipedia (EN): US-Präsidentschaftswahl 2024 – Results by state', u: 'https://en.wikipedia.org/wiki/2024_United_States_presidential_election#Results_by_state' },
+        official: [
+          { t: 'Federal Election Commission: Official 2024 Presidential General Election Results (PDF, erstellt am 16. Jan. 2025)', u: 'https://www.fec.gov/resources/cms-content/documents/2024presgeresults.pdf', v: 'Bestätigt die gespeicherten Gesamtzahlen: Trump 77.302.580 Stimmen (49,80 %), Harris 75.017.613 (48,32 %), Stein 0,56 %, Kennedy 0,49 %, Oliver 0,42 %, insgesamt 155.238.302 Stimmen; Wahlleute 312 und 226.' },
+          { t: 'US-Nationalarchiv: Ergebnisse des Electoral College 2024', u: 'https://www.archives.gov/electoral-college/2024', v: 'Bestätigt 312 Wahlleute für Trump und 226 für Harris, 270 nötig.' }
+        ],
+        note: 'Verglichen wurden nur die Gesamtzahlen; die Staaten- und County-Ergebnisse wurden nicht gegen die Wahlbehörden der Bundesstaaten geprüft. Nicht belegt: die Wahlbeteiligung (63,9 %) und die Aussage zu den Swing States.'
+      },
       note: 'Trump gewann alle sieben Swing States und als erster Republikaner seit 2004 auch die landesweite Stimmenmehrheit.',
       c: [
         ['rep', 'Donald Trump', 'Republikaner', '#D22532', 49.80, null],
@@ -894,8 +921,17 @@ window.WAHL_DE = {
     gov: ['pt'], govNote: 'Präsident Lula (PT) regiert bis 1. Januar 2027',
     next: 'Stichwahl um die Präsidentschaft am 25. Oktober 2026', sub: 'BRA',
     el: [{
-      t: 'Präsidentschaftswahl 2026 · 1. Wahlgang', d: '2026-10-04', k: 'pres', to: 78.9,
-      note: 'Wahl von gestern: Flávio Bolsonaro und Lula treten am 25. Oktober in der Stichwahl gegeneinander an.',
+      t: 'Präsidentschaftswahl 2026 · 1. Wahlgang', d: '2026-10-04', k: 'pres', to: 78.9, runoffDue: '2026-10-25',
+      src: {
+        checked: '2026-10-06',
+        origin: { t: 'Englische Wikipedia, 2026 Brazilian general election, Tabelle „President“ (1. Wahlgang) und Tabelle der Ergebnisse nach Bundesstaaten. Für diese Zahlen nennt die Wikipedia-Seite keinen eigenen Beleg-Link.', l: 'Wikipedia (EN): Brasilianische Wahl 2026 (2026 Brazilian general election)', u: 'https://en.wikipedia.org/wiki/2026_Brazilian_general_election' },
+        official: [
+          { t: 'TSE (Oberstes Wahlgericht): „Flávio Bolsonaro (PL) e Lula (PT) vão disputar o 2º turno …“, Meldung vom 5. Okt. 2026', u: 'https://www.tse.jus.br/comunicacao/noticias/2026/Outubro/flavio-bolsonaro-e-lula-vao-disputar-o-2o-turno-para-a-presidencia-da-republica', v: 'Bei 99,99 % ausgezählter Urnen (5. Okt., 0:11 Uhr): Flávio Bolsonaro 47,03 %, Lula 45,16 % der gültigen Stimmen; beide kommen in die Stichwahl. Die Anteile stimmen mit den gespeicherten Werten überein.' },
+          { t: 'TSE: Eleições 2026 – principais datas do calendário eleitoral (6. März 2026)', u: 'https://www.tse.jus.br/comunicacao/noticias/2026/Marco/eleicoes-2026-confira-as-principais-datas-do-calendario-eleitoral', v: 'Bestätigt den 1. Wahlgang am 4. Okt. 2026 und eine mögliche Stichwahl am 25. Okt. 2026.' }
+        ],
+        note: 'Die Seiten laden im normalen Browser; der TSE-Server weist automatische Abrufe ab. Abweichung: Die TSE-Meldung (99,99 % ausgezählt) nennt 56.104.268 Stimmen für Bolsonaro und 53.876.617 für Lula, die Wikipedia-Tabelle 56.104.503 und 53.879.538; der Atlas speichert nur Anteile. Nicht belegt: die Anteile der übrigen Kandidaten, die Wahlbeteiligung (78,9 %) und die Staatsergebnisse. Das Ergebnisportal des TSE (resultados.tse.jus.br) ist interaktiv; sein Inhalt war nicht automatisch lesbar.'
+      },
+      note: 'Erster Wahlgang am 4. Oktober 2026: Flávio Bolsonaro und Lula treten am 25. Oktober 2026 in der Stichwahl gegeneinander an.',
       c: [
         ['pl', 'Flávio Bolsonaro', 'PL', '#1F5AA6', 47.03, null],
         ['pt', 'Luiz Inácio Lula da Silva', 'PT', '#E20E28', 45.16, null],
