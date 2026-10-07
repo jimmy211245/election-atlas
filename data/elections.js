@@ -27,6 +27,15 @@ window.WAHL = {
     next: 'Bundestag election by 2029 at the latest', sub: 'DEU',
     el: [{
       t: 'Bundestag election 2025', d: '2025-02-23', k: 'parl', ch: 'Bundestag', seats: 630, to: 82.5, vl: 'Second votes',
+      src: {
+        checked: '2026-10-06',
+        origin: { t: 'No individual source was recorded when the national totals were entered. The regional maps use the official open data of the Federal Returning Officer (kerg2.csv, linked below).' },
+        official: [
+          { t: 'Federal Returning Officer: Bundestag election 2025, result at federal level', u: 'https://www.bundeswahlleiterin.de/bundestagswahlen/2025/ergebnisse/bund-99.html', v: 'The page is marked “final result”. Confirms turnout (82.5%) and the seat distribution (630 seats; stored CDU/CSU 208 = CDU 164 + CSU 44).' },
+          { t: 'Federal Returning Officer: open data file kerg2.csv (“official final result”)', u: 'https://www.bundeswahlleiterin.de/bundestagswahlen/2025/ergebnisse/opendata/btw25/csv/kerg2.csv', v: 'The second-vote shares of all nine stored parties agree to two decimals (compared on 6 Oct 2026).' }
+        ],
+        note: 'No deviations found. Not covered by these sources: the seat changes against 2021.'
+      },
       note: 'CDU 22.6% · CSU 6.0%. BSW (4.98%) and FDP fell short of the 5% threshold. 23 constituency winners did not get a seat because their party’s second votes did not cover it.',
       p: [
         ['linke', 'Linke', 'The Left', '#BE3075', 8.77, 64, 25],
@@ -388,15 +397,24 @@ window.WAHL = {
     next: 'Government formation under way',
     el: [{
       t: 'Saeima election 2026', d: '2026-10-03', k: 'parl', ch: 'Saeima', seats: 100, to: 51.8, prelim: true,
-      note: 'Election three days ago; preliminary result. The Union of Greens and Farmers (ZZS) failed to return to parliament.',
+      pbase: 'Shares as published by the CVK: percentages of the 804,501 valid ballot envelopes. The seven lists below 5% together received 11.06%; 1.32% of the envelopes (10,655) are not assigned to any list. The shares therefore do not add up to 100%.',
+      src: {
+        checked: '2026-10-06',
+        origin: { t: 'Vote shares: taken from the CVK results page linked below (provisional results; percentages of the valid ballot envelopes). Seats and turnout agree with the CVK. The seat changes against 2022 and the list names come from the English Wikipedia and were not checked against the CVK.', l: 'Wikipedia (EN): 2026 Latvian parliamentary election', u: 'https://en.wikipedia.org/wiki/2026_Latvian_parliamentary_election' },
+        official: [
+          { t: 'Central Election Commission (CVK): 15th Saeima elections – results', u: 'https://www.cvk.lv/saeima-2026-rezultati', v: 'The page is headed “provisional results” (last updated 5 Oct 2026, 12:23). Source of the stored vote shares: the percentages published there, which relate to the 804,501 valid ballot envelopes (example: United List, 283,892 votes = 35.288%). All seats (41, 17, 15, 10, 10, 7 and 0) and the turnout (51.8%: 806,641 of 1,557,615) agree with the stored values; the seven stored shares equal the published ones (compared on 6 Oct 2026).' }
+        ],
+        note: 'Not covered by the CVK page: the seat changes against 2022. The result is provisional, as marked by the CVK.'
+      },
+      note: 'Election on 3 October 2026; preliminary result. The Union of Greens and Farmers (ZZS) failed to return to parliament.',
       p: [
-        ['pro', 'PRO', 'The Progressives', '#E85A8C', 7.98, 10, 0],
-        ['jv', 'JV', 'New Unity', '#6AB647', 6.45, 7, -19],
-        ['zzs', 'ZZS', 'Union of Greens and Farmers', '#02723A', 4.46, 0, -16],
-        ['as', 'AS', 'United List', '#F29A00', 35.76, 41, 26],
-        ['lpv', 'LPV', 'Latvia First', '#A8343C', 13.25, 17, 8],
-        ['sv', 'SV/AJ', 'Sovereign Power / Alliance of Young Latvians', '#6A5ACD', 11.87, 15, 'neu'],
-        ['na', 'NA', 'National Alliance', '#5C1A1A', 9.02, 10, -3]
+        ['pro', 'PRO', 'The Progressives', '#E85A8C', 7.878, 10, 0],
+        ['jv', 'JV', 'New Unity', '#6AB647', 6.362, 7, -19],
+        ['zzs', 'ZZS', 'Union of Greens and Farmers', '#02723A', 4.401, 0, -16],
+        ['as', 'AS', 'United List', '#F29A00', 35.288, 41, 26],
+        ['lpv', 'LPV', 'Latvia First', '#A8343C', 13.076, 17, 8],
+        ['sv', 'SV/AJ', 'Sovereign Power / Alliance of Young Latvians', '#6A5ACD', 11.710, 15, 'neu'],
+        ['na', 'NA', 'National Alliance', '#5C1A1A', 8.897, 10, -3]
       ]
     }]
   },
@@ -817,6 +835,15 @@ window.WAHL = {
     focus: [[-125, 24.4], [-66.9, 49.4]],
     el: [{
       t: 'Presidential election 2024', d: '2024-11-05', k: 'pres', to: 63.9, ev: { rep: 312, dem: 226 },
+      src: {
+        checked: '2026-10-06',
+        origin: { t: 'English Wikipedia, 2024 United States presidential election, table “Results by state” (national total row). The state and county results come from that table and from a county data set (tonmcg).', l: 'Wikipedia (EN): 2024 US presidential election – Results by state', u: 'https://en.wikipedia.org/wiki/2024_United_States_presidential_election#Results_by_state' },
+        official: [
+          { t: 'Federal Election Commission: Official 2024 Presidential General Election Results (PDF, compiled 16 Jan 2025)', u: 'https://www.fec.gov/resources/cms-content/documents/2024presgeresults.pdf', v: 'Confirms the stored national figures: Trump 77,302,580 votes (49.80%), Harris 75,017,613 (48.32%), Stein 0.56%, Kennedy 0.49%, Oliver 0.42%, 155,238,302 votes in total; electoral votes 312 and 226.' },
+          { t: 'U.S. National Archives: 2024 Electoral College results', u: 'https://www.archives.gov/electoral-college/2024', v: 'Confirms 312 electoral votes for Trump and 226 for Harris, 270 needed.' }
+        ],
+        note: 'Only the national totals were compared; the state and county results were not checked against the states’ election offices. Not covered: turnout (63.9%) and the statement about the swing states.'
+      },
       note: 'Trump won all seven swing states and became the first Republican since 2004 to win the national popular vote.',
       c: [
         ['rep', 'Donald Trump', 'Republicans', '#D22532', 49.8, null],
@@ -894,8 +921,17 @@ window.WAHL = {
     gov: ['pt'], govNote: 'President Lula (PT) in office until 1 January 2027',
     next: 'Presidential runoff on 25 October 2026', sub: 'BRA',
     el: [{
-      t: 'Presidential election 2026 · 1st round', d: '2026-10-04', k: 'pres', to: 78.9,
-      note: 'Election held two days ago: Flávio Bolsonaro and Lula face each other in the runoff on 25 October.',
+      t: 'Presidential election 2026 · 1st round', d: '2026-10-04', k: 'pres', to: 78.9, runoffDue: '2026-10-25',
+      src: {
+        checked: '2026-10-06',
+        origin: { t: 'English Wikipedia, 2026 Brazilian general election, table “President” (first round) and the table of results by federative unit. For these figures the Wikipedia page gives no reference link of its own.', l: 'Wikipedia (EN): 2026 Brazilian general election', u: 'https://en.wikipedia.org/wiki/2026_Brazilian_general_election' },
+        official: [
+          { t: 'TSE (Superior Electoral Court): “Flávio Bolsonaro (PL) e Lula (PT) vão disputar o 2º turno …”, news item of 5 Oct 2026', u: 'https://www.tse.jus.br/comunicacao/noticias/2026/Outubro/flavio-bolsonaro-e-lula-vao-disputar-o-2o-turno-para-a-presidencia-da-republica', v: 'With 99.99% of the ballot boxes counted (0:11 on 5 Oct): Flávio Bolsonaro 47.03%, Lula 45.16% of the valid votes; both advance to the runoff. These shares match the stored values.' },
+          { t: 'TSE: Eleições 2026 – principais datas do calendário eleitoral (6 Mar 2026)', u: 'https://www.tse.jus.br/comunicacao/noticias/2026/Marco/eleicoes-2026-confira-as-principais-datas-do-calendario-eleitoral', v: 'Confirms the first round on 4 Oct 2026 and a possible runoff on 25 Oct 2026.' }
+        ],
+        note: 'The pages load in a normal browser; the TSE server rejects automated requests. Deviation: the TSE item (99.99% counted) gives 56,104,268 votes for Bolsonaro and 53,876,617 for Lula, the Wikipedia table 56,104,503 and 53,879,538; the atlas stores shares only. Not covered: the shares of the other candidates, turnout (78.9%) and the state results. The TSE results portal (resultados.tse.jus.br) is interactive; its content could not be read automatically.'
+      },
+      note: 'First round on 4 October 2026: Flávio Bolsonaro and Lula face each other in the runoff on 25 October 2026.',
       c: [
         ['pl', 'Flávio Bolsonaro', 'PL', '#1F5AA6', 47.03, null],
         ['pt', 'Luiz Inácio Lula da Silva', 'PT', '#E20E28', 45.16, null],

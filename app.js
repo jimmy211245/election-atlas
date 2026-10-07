@@ -113,11 +113,33 @@
   };
   const shortName = n => { if (SHORT[n]) return SHORT[n]; const parts = n.split(' '); return parts.length > 1 ? parts[parts.length - 1] : n; };
 
+  /* Election status: two independent properties of the shown election.
+       e.runoffDue = ISO date of a pending runoff (set in the data, never inferred from the calendar)
+       e.prelim    = result is preliminary */
+  const isOpen = e => !!(e && e.runoffDue);
+  function statusLine(e, short) {
+    const out = [];
+    if (e.runoffDue) out.push(tr('leading after the 1st round', 'führt nach dem 1. Wahlgang') + ' · ' + tr('runoff on ', 'Stichwahl am ') + (short ? dShort : dLong)(e.runoffDue));
+    if (e.prelim) out.push(tr('preliminary', 'vorläufig'));
+    return out;
+  }
+  function statusBadges(e) {
+    const b = [];
+    if (e.runoffDue) b.push(`<span class="badge warn">${tr('runoff pending', 'Stichwahl ausstehend')} · ${dLong(e.runoffDue)}</span>`);
+    if (e.prelim) b.push(`<span class="badge warn">${tr('preliminary result', 'vorläufiges Ergebnis')}</span>`);
+    return b.length ? `<section class="badges">${b.join('')}</section>` : '';
+  }
+  // List marker bar: hatched while the shown election is still open
+  const barBg = (e, col) => isOpen(e) ? `background-image:repeating-linear-gradient(45deg,${col} 0 2px,transparent 2px 4px)` : `background:${col}`;
+  // Display title: while a runoff is pending the status line already says "1st round", so the round suffix of the data title is left out here
+  const shownTitle = e => isOpen(e) ? e.t.replace(/\s*·\s*(1st round|1\. Wahlgang)\s*$/, '') : e.t;
+  const openCountries = () => LIST.filter(c => isOpen(mainEl(c)));
+
   function winnerOf(e) {
     if (e.k === 'pres') {
       const r2 = e.c.some(x => x[5] != null), k = r2 ? 5 : 4;
       const w = e.c.reduce((a, b) => (b[k] || 0) > (a[k] || 0) ? b : a);
-      return { id: w[0], short: shortName(w[1]), name: w[1], party: w[2], color: w[3], pct: w[k], pres: true, runoff: r2 };
+      return { id: w[0], short: shortName(w[1]), name: w[1], party: w[2], color: w[3], pct: w[k], pres: true, runoff: r2, open: isOpen(e) };
     }
     const hasV = e.p.some(p => p[4] != null);
     const w = e.p.reduce((a, b) => (hasV ? (b[4] || 0) > (a[4] || 0) : b[5] > a[5]) ? b : a);
@@ -142,7 +164,7 @@
   function modeColor(c) { return S.mode === 'gov' ? govParty(c).color : winnerOf(mainEl(c)).color; }
 
   /* ---------------- State ---------------- */
-  const S = { mode: 'win', preset: 'welt', country: null, el: 0, yr: 0, metric: 'votes', layer: null, region: null, shade: true };
+  const S = { q: '', lgOpen: false, mode: 'win', preset: 'welt', country: null, el: 0, yr: 0, metric: 'votes', layer: null, region: null, shade: true };
   try { const m = localStorage.getItem('wahlatlas-mode'); if (m === 'gov' || m === 'win') S.mode = m; const sh = localStorage.getItem('wahlatlas-shade'); if (sh === '0') S.shade = false; } catch (e) { /* no storage */ }
 
   /* ---------------- DOM ---------------- */
@@ -383,10 +405,38 @@
   function updateMarkers() {
     const k = WV.t.k;
     WV.mk.selectAll('circle').attr('r', 4.5 / k).attr('stroke-width', 1.4 / k).attr('display', k > 7 ? 'none' : null);
+    sizeHatch(worldSvg, k);
   }
+  /* Hatching = result not final (runoff pending). Pattern keeps the leader's colour; stripes are drawn
+     lighter or darker than it, and are rescaled on zoom so they keep the same size on screen. */
+  const HATCH = 6;
+  function sizeHatch(svg, k) {
+    const s = HATCH / (k || 1);
+    svg.selectAll('pattern.hatch').each(function () {
+      const p = d3.select(this);
+      p.attr('width', s).attr('height', s);
+      p.select('.h-bg').attr('width', s).attr('height', s);
+      p.select('.h-ln').attr('x1', s / 2).attr('x2', s / 2).attr('y1', 0).attr('y2', s).attr('stroke-width', 0.44 * s);
+    });
+  }
+  function hatchFill(svg, col) {
+    let defs = svg.select('defs'); if (defs.empty()) defs = svg.insert('defs', ':first-child');
+    const id = 'hatch-' + col.replace('#', '');
+    if (defs.select('#' + id).empty()) {
+      const ln = lum(col) > 0.3 ? mix(col, '#000000', 0.55) : mix(col, '#ffffff', 0.62);
+      const p = defs.append('pattern').attr('id', id).attr('class', 'hatch').attr('patternUnits', 'userSpaceOnUse').attr('patternTransform', 'rotate(45)');
+      p.append('rect').attr('class', 'h-bg').attr('fill', col);
+      p.append('line').attr('class', 'h-ln').attr('stroke', ln);
+      sizeHatch(svg, svg === worldSvg ? WV.t.k : DV.k);
+    }
+    return 'url(#' + id + ')';
+  }
+  // Fill of a country in the current colour mode: hatched while its shown election is still open
+  const countryFill = (svg, c) => { const col = pc(modeColor(c)); return S.mode === 'win' && isOpen(mainEl(c)) ? hatchFill(svg, col) : col; };
+
   function recolorWorld() {
-    WV.paths.style('fill', d => { const c = BY_ISO.get(d.id); return c ? pc(modeColor(c)) : null; });
-    WV.mk.selectAll('circle').style('fill', d => pc(modeColor(BY_ISO.get(d.id))));
+    WV.paths.style('fill', d => { const c = BY_ISO.get(d.id); return c ? countryFill(worldSvg, c) : null; });
+    WV.mk.selectAll('circle').style('fill', d => countryFill(worldSvg, BY_ISO.get(d.id)));
     const stripe = document.getElementById('stripe');
     const cols = LIST.map(c => modeColor(c));
     stripe.innerHTML = cols.map(col => `<i style="background:${pc(col)}"></i>`).join('');
@@ -475,7 +525,8 @@
     const feat = WV.byIso.get(c.iso);
     const isUS = c.code === 'USA';
     const pad = Math.round(Math.min(w, h) * 0.06) + 8;
-    const topPad = pad + 40, bottomPad = pad + (w < 700 ? 96 : 34);
+    // Phones: the legend sits below the map, so no room is reserved for it inside; wide layouts with a narrow map still overlay it
+    const topPad = pad + 40, bottomPad = pad + (!matchMedia('(max-width: 860px)').matches && w < 700 ? 96 : 34);
     let proj;
     if (isUS) proj = d3.geoAlbersUsa();
     else {
@@ -503,7 +554,7 @@
     if (def) drawLayer(); else drawWhole(feat);
     const maxK = def ? (DV.L || def.layers[0]).maxZoom || 16 : 10;
     DV.zoom = d3.zoom().scaleExtent([1, maxK]).extent([[0, 0], [w, h]]).translateExtent([[0, 0], [w, h]])
-      .on('zoom', ev => { DV.root.attr('transform', ev.transform); DV.k = ev.transform.k; })
+      .on('zoom', ev => { DV.root.attr('transform', ev.transform); DV.k = ev.transform.k; sizeHatch(detailSvg, DV.k); })
       .on('start', hideTip);
     detailSvg.call(DV.zoom).on('dblclick.zoom', null);
     recolorDetail();
@@ -547,7 +598,7 @@
     if (!DV.c || !DV.root) return;
     const c = DV.c;
     if (DV.ctx) DV.ctx.style('fill', d => { const cc = BY_ISO.get(d.id); return cc ? mix(LAND, pc(modeColor(cc)), DARK ? 0.24 : 0.26) : null; });
-    if (DV.whole) DV.whole.style('fill', pc(modeColor(c)));
+    if (DV.whole) DV.whole.style('fill', countryFill(detailSvg, c));
     if (DV.regions && DV.L) DV.regions.style('fill', f => regionFill(c, DV.L, DV.recs.get(DV.L.key(f))));
   }
 
@@ -601,7 +652,8 @@
       if (!rows.length) rows = e.p.slice().sort((a, b) => b[5] - a[5]).slice(0, 3).map(p => ({ n: p[1] + ' · ' + p[5] + tr(' seats', ' Sitze'), v: null, c: pc(p[3]) }));
     }
     const g = govParty(c);
-    return `<div class="tip-h">${esc(c.n)}</div><div class="tip-s">${esc(e.t)}${e.k === 'pres' && w.runoff ? tr(' · runoff', ' · Stichwahl') : ''} · ${dShort(e.d)}${e.prelim ? tr(' · preliminary', ' · vorläufig') : ''}</div>`
+    const st = statusLine(e, true);
+    return `<div class="tip-h">${esc(c.n)}</div><div class="tip-s">${esc(shownTitle(e))}${e.k === 'pres' && w.runoff ? tr(' · runoff', ' · Stichwahl') : ''} · ${dShort(e.d)}</div>${st.length ? `<div class="tip-st">${esc(st.join(' · '))}</div>` : ''}`
       + barRows(rows)
       + `<div class="tip-n">${esc(c.hog[0])}: ${esc(c.hog[1])}${g.id ? ' (' + esc(g.short) + ')' : ''}${ctx ? tr(' · click to switch', ' · Klicken zum Wechseln') : ''}</div>`;
   }
@@ -617,26 +669,43 @@
   /* ================================================================
      Legend, header, breadcrumb
      ================================================================ */
+  /* Legend: title (what the colours mean) and an optional "hatched" flag stay visible; on phones the colour keys and
+     explanations (body) fold away behind a button. S.lgOpen survives language, country and mode changes. */
+  function setLegend(title, body, flag) {
+    const lbl = S.lgOpen ? tr('Hide legend', 'Legende ausblenden') : tr('Show legend', 'Legende anzeigen');
+    legend.hidden = false;
+    legend.classList.toggle('is-open', S.lgOpen);
+    legend.innerHTML = `<div class="lg-main"><p class="legend-t">${title}</p>${flag ? `<p class="lg-flag"><i class="sw hatch"></i><span>${flag}</span></p>` : ''}</div>`
+      + `<button type="button" class="lg-toggle" id="lg-toggle" aria-expanded="${S.lgOpen}" aria-controls="lg-body"><span class="lg-lbl">${lbl}</span><span class="lg-chev" aria-hidden="true"></span></button>`
+      + `<div class="lg-body" id="lg-body">${body}</div>`;
+  }
   function renderLegend() {
+    legend.setAttribute('aria-label', tr('Legend', 'Legende'));
     if (!S.country || !DV.c || DV.c.code !== S.country || !mapEl.classList.contains('is-detail')) {
       if (S.country) { legend.hidden = true; return; }
-      legend.hidden = false;
-      legend.innerHTML = S.mode === 'win'
-        ? `<p class="legend-t">${tr('Colour = largest party or election winner', 'Farbe = stärkste Partei bzw. Wahlsieger')}</p><div class="lg-items"><span><i class="sw" style="background:var(--land)"></i>${tr('not covered', 'nicht erfasst')}</span></div><p class="legend-s">${tr('Latest national election in each country. In presidential systems the presidential election counts.', 'Letzte nationale Wahl je Land. Bei Präsidialsystemen zählt die Präsidentschaftswahl.')}</p>`
-        : `<p class="legend-t">${tr('Colour = party of the head of government', 'Farbe = Partei der Regierungsspitze')}</p><div class="lg-items"><span><i class="sw" style="background:#8A8F98"></i>${tr('independent/collegial government', 'parteilos/Kollegialregierung')}</span><span><i class="sw" style="background:var(--land)"></i>${tr('not covered', 'nicht erfasst')}</span></div><p class="legend-s">${tr('As of 5 October 2026.', 'Stand 5. Oktober 2026.')}</p>`;
+      const oc = openCountries();
+      const names = esc(oc.map(c => c.n).join(', '));
+      const flag = oc.length && S.mode === 'win' ? `${tr('hatched = runoff pending', 'schraffiert = Stichwahl ausstehend')} (${names})` : '';
+      const hatchItem = oc.length ? `<span class="wrap lg-only-wide"><i class="sw hatch"></i>${tr('hatched = runoff pending, leader after the 1st round', 'schraffiert = Stichwahl ausstehend, Führender nach dem 1. Wahlgang')} (${names})</span>` : '';
+      if (S.mode === 'win') setLegend(tr('Colour = largest party or leading candidate', 'Farbe = stärkste Partei bzw. Führender der letzten Wahl'),
+        `<div class="lg-items"><span><i class="sw" style="background:var(--land)"></i>${tr('not covered', 'nicht erfasst')}</span>${hatchItem}</div><p class="legend-s">${tr('Latest national election in each country. In presidential systems the presidential election counts.', 'Letzte nationale Wahl je Land. Bei Präsidialsystemen zählt die Präsidentschaftswahl.')}</p>`, flag);
+      else setLegend(tr('Colour = party of the head of government', 'Farbe = Partei der Regierungsspitze'),
+        `<div class="lg-items"><span><i class="sw" style="background:#8A8F98"></i>${tr('independent/collegial government', 'parteilos/Kollegialregierung')}</span><span><i class="sw" style="background:var(--land)"></i>${tr('not covered', 'nicht erfasst')}</span></div><p class="legend-s">${tr('As of 5 October 2026.', 'Stand 5. Oktober 2026.')}</p>`, '');
       return;
     }
-    legend.hidden = false;
     const c = DV.c;
     if (!DV.L) {
       const col = pc(modeColor(c));
       const lab = S.mode === 'win' ? winnerOf(mainEl(c)) : govParty(c);
-      legend.innerHTML = `<p class="legend-t">${S.mode === 'win' ? tr('Election winner', 'Wahlsieger') : tr('Governing party', 'Regierungspartei')}</p><div class="lg-items"><span><i class="sw" style="background:${col}"></i>${esc(lab.short)}</span></div><p class="legend-s">${tr('No regional results are available for this country. Neighbouring countries are shown faded in their own colour.', 'Für dieses Land sind keine regionalen Ergebnisse hinterlegt. Nachbarländer blass in ihrer Farbe.')}</p>`;
+      const open = S.mode === 'win' && isOpen(mainEl(c));
+      const title = S.mode !== 'win' ? tr('Governing party', 'Regierungspartei') : open ? tr('Leading after the 1st round', 'Führt nach dem 1. Wahlgang') : lab.pres ? tr('Elected', 'Gewählt') : tr('Largest party', 'Stärkste Partei');
+      const hat = open ? `${tr('hatched = runoff pending', 'schraffiert = Stichwahl ausstehend')} · ${dLong(mainEl(c).runoffDue)}` : '';
+      setLegend(title, `<div class="lg-items"><span><i class="sw${open ? ' hatch' : ''}" style="${open ? '' : 'background:' + col}"></i>${esc(lab.short)}</span>${open ? `<span class="wrap lg-only-wide">${esc(hat)}</span>` : ''}</div><p class="legend-s">${tr('No regional results are available for this country. Neighbouring countries are shown faded in their own colour.', 'Für dieses Land sind keine regionalen Ergebnisse hinterlegt. Nachbarländer blass in ihrer Farbe.')}</p>`, esc(hat));
       return;
     }
     const yr = DV.yrEl ? DV.yrEl.d.slice(0, 4) : '';
     if (DV.noData) {
-      legend.innerHTML = `<p class="legend-t">${esc(tx(DV.L.legendTitle))} · ${yr}</p><p class="legend-s">${tr('No regional results are available for this election.', 'Für diese Wahl liegen keine regionalen Ergebnisse vor.')}</p>`;
+      setLegend(`${esc(tx(DV.L.legendTitle))} · ${yr}`, `<p class="legend-s">${tr('No regional results are available for this election.', 'Für diese Wahl liegen keine regionalen Ergebnisse vor.')}</p>`, '');
       return;
     }
     const L = DV.L, counts = new Map();
@@ -656,7 +725,7 @@
     const items = shown.map(([id, n]) => { const p = subParty(c, L, id); return `<span><i class="sw" style="background:${pc(p.color)}"></i>${esc(p.short)} <b class="num">${n}</b></span>`; }).join('')
       + (rest.length ? `<span title="${esc(rest.map(([id, n]) => subParty(c, L, id).short + ' ' + n).join(', '))}">+ ${rest.length} ${tr('more', 'weitere')} (${rest.reduce((s, x) => s + x[1], 0)})</span>` : '');
     const ramp = S.shade ? `<div class="ramp"><span>${tr('narrow', 'knapp')}</span><i style="background:linear-gradient(90deg, ${shadeOf('#777777', 0.34)}, ${pc('#777777')})"></i><span>${tr('clear', 'deutlich')}</span></div>` : '';
-    legend.innerHTML = `<p class="legend-t">${esc(tx(L.legendTitle))}${yr ? ' · ' + yr : ''}</p><div class="lg-items">${items}</div>${ramp}`;
+    setLegend(`${esc(tx(L.legendTitle))}${yr ? ' · ' + yr : ''}`, `<div class="lg-items">${items}</div>${ramp}`, '');
   }
 
   function renderCrumb() {
@@ -684,7 +753,7 @@
     set('.mark', tr('Election Atlas', 'Wahlatlas'));
     set('#meta', tr('Latest national elections · as of 5 October 2026', 'Letzte nationale Wahlen · Stand 5. Oktober 2026'));
     set('#lbl-view', tr('View', 'Ansicht')); set('#lbl-mode', tr('Colour', 'Farbe')); set('#lbl-lang', tr('Language', 'Sprache'));
-    set('#mode-win', tr('Election winner', 'Wahlsieger')); set('#mode-gov', tr('Government', 'Regierung'));
+    set('#mode-win', tr('Election result', 'Wahlergebnis')); set('#mode-gov', tr('Government', 'Regierung'));
     set('#back', tr('← World map', '← Weltkarte')); set('#loading', tr('Loading regional data …', 'Regionaldaten werden geladen …'));
     aria('#map', tr('Interactive map of election results', 'Interaktive Karte der Wahlergebnisse'));
     aria('#world', tr('World map coloured by election result', 'Weltkarte, eingefärbt nach Wahlergebnis'));
@@ -753,15 +822,113 @@
      Panel
      ================================================================ */
   function renderPanel() {
-    if (!S.country) { panel.innerHTML = overviewHTML(); return; }
+    if (!S.country) { panel.innerHTML = overviewHTML(); updateSearch(false); return; }
     panel.innerHTML = countryHTML(C[S.country]);
+  }
+
+  /* ---------------- Country search (overview) ---------------- */
+  // Case and accents are ignored (ä→a, ß→ss, ø→o); ä/ö/ü are also tried as ae/oe/ue. Terms of up to 3 characters
+  // (USA, US, UK, NZ …) only match exactly, so "us" does not hit every name that contains "us".
+  const foldPlain = s => s.toLowerCase().replace(/ß/g, 'ss').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ø/g, 'o').replace(/ł/g, 'l').replace(/đ/g, 'd').replace(/æ/g, 'ae').replace(/œ/g, 'oe').replace(/[.'’]/g, '').replace(/\s+/g, ' ').trim();
+  const foldAlt = s => foldPlain(s.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue'));
+  const foldForms = s => [...new Set([foldPlain(s), foldAlt(s)])];
+  // Extra search names (short forms and common alternative names); the German and English country names are added automatically
+  const ALIASES = {
+    USA: ['USA', 'US', 'U.S.', 'U.S.A.', 'America', 'Amerika', 'United States of America', 'Vereinigte Staaten von Amerika'],
+    GBR: ['UK', 'U.K.', 'GB', 'Great Britain', 'Britain', 'Großbritannien', 'Britannien'],
+    DEU: ['DE'], AUT: ['AT'], CHE: ['CH', 'Suisse'], FRA: ['FR'], ESP: ['ES'], ITA: ['IT'], NLD: ['NL', 'Holland'], POL: ['PL'], NZL: ['NZ'],
+    CZE: ['Czech Republic', 'Tschechische Republik', 'Tschechei'], TUR: ['Türkiye'], KOR: ['Korea', 'Republic of Korea'], ZAF: ['RSA'],
+    BRA: ['Brasil'], GRC: ['Hellas'], HRV: ['Hrvatska'], IRL: ['Éire'], JPN: ['Nippon']
+  };
+  let SEARCH_IDX = null;
+  function searchIndex() {
+    if (SEARCH_IDX) return SEARCH_IDX;
+    const de = window.WAHL_DE || window.WAHL;
+    SEARCH_IDX = new Map(Object.keys(window.WAHL.countries).map(code => {
+      const names = [window.WAHL.countries[code].n, de.countries[code].n, code, ...(ALIASES[code] || [])];
+      return [code, [...new Set(names.flatMap(foldForms))]];
+    }));
+    return SEARCH_IDX;
+  }
+  // 0 exact · 1 starts with · 2 a word starts with · 3 contains · Infinity no match
+  function termScore(tok, t) {
+    if (t === tok) return 0;
+    if (t.length <= 3) return Infinity;
+    if (t.startsWith(tok)) return 1;
+    if (t.split(' ').some(w => w.startsWith(tok))) return 2;
+    return t.includes(tok) ? 3 : Infinity;
+  }
+  function searchCountries(q) {
+    const forms = foldForms(q).map(f => f.split(' ').filter(Boolean)).filter(a => a.length);
+    if (!forms.length) return [];
+    const idx = searchIndex(), out = [];
+    for (const c of LIST) {
+      const terms = idx.get(c.code) || []; let best = Infinity;
+      for (const toks of forms) best = Math.min(best, Math.max(...toks.map(tok => Math.min(...terms.map(t => termScore(tok, t))))));
+      if (best < Infinity) out.push({ c, s: best });
+    }
+    return out.sort((a, b) => a.s - b.s || a.c.n.localeCompare(b.c.n, LANG)).map(x => x.c);
+  }
+  const hitCount = n => n === 1 ? tr('1 result', '1 Treffer') : tr(n + ' results', n + ' Treffer');
+  function searchBodyHTML(q, res) {
+    if (!res.length) {
+      return `<p class="note sq-empty">${tr(`No country found for “${esc(q)}”. Check the spelling, or try the name in German or English, or a short form such as USA or UK.`, `Kein Land gefunden für „${esc(q)}“. Prüfe die Schreibweise oder versuche den Namen auf Deutsch oder Englisch oder eine Kurzform wie USA oder UK.`)}</p>`
+        + `<button type="button" class="btn sq-clear-btn" data-sq-clear>${tr('Clear search', 'Suche löschen')}</button>`;
+    }
+    return `<p class="eyebrow">${hitCount(res.length)} · ${S.mode === 'win' ? tr('election result', 'Wahlergebnis') : tr('head of government', 'Regierungsspitze')}</p><ul class="rows">${res.map(countryRowHTML).join('')}</ul>`;
+  }
+  let srTimer;
+  // Updates only the results area (the input keeps focus and cursor); `announce` sends the hit count to screen readers, debounced
+  function updateSearch(announce) {
+    const input = document.getElementById('ov-q'); if (!input) return;
+    const box = document.getElementById('ov-results'), lists = document.getElementById('ov-lists'), sr = document.getElementById('ov-sr');
+    const q = S.q.trim();
+    document.getElementById('ov-clear').hidden = !S.q;
+    clearTimeout(srTimer);
+    if (!q) { box.hidden = true; box.innerHTML = ''; lists.hidden = false; if (!announce) sr.textContent = ''; return; }
+    const res = searchCountries(q);
+    lists.hidden = true; box.hidden = false; box.innerHTML = searchBodyHTML(q, res);
+    if (announce) srTimer = setTimeout(() => { sr.textContent = res.length ? hitCount(res.length) : tr('No results', 'Keine Treffer'); }, 500);
+  }
+  function clearSearch(focus) {
+    S.q = ''; const input = document.getElementById('ov-q'); if (input) input.value = '';
+    updateSearch(false);
+    const sr = document.getElementById('ov-sr'); if (sr) sr.textContent = tr('Search cleared', 'Suche gelöscht');
+    if (focus && input) input.focus();
+  }
+
+  // One country row of the "All countries" list, in the current mode (also used for search hits)
+  function countryRowHTML(c) {
+    const e = mainEl(c);
+    if (S.mode === 'gov') {
+      const g = govParty(c);
+      return `<li><button type="button" class="row" data-open="${c.code}"><i class="bar6" style="background:${pc(g.color)}"></i><span><span class="row-t">${esc(c.n)}</span><span class="row-s">${esc(c.hog[1])}${g.id ? ' · ' + esc(g.short) : ''}</span></span><span class="row-r">${esc(c.hog[0].replace(/ \(.*\)/, ''))}</span></button></li>`;
+    }
+    const w = winnerOf(e), st = statusLine(e, true);
+    return `<li><button type="button" class="row" data-open="${c.code}"><i class="bar6" style="${barBg(e, pc(w.color))}"></i><span><span class="row-t">${esc(c.n)}</span><span class="row-s${st.length ? ' st' : ''}">${esc(shownTitle(e))}${st.length ? ' · ' + esc(st.join(' · ')) : ''}</span></span><span class="row-r"><b>${esc(w.short)}</b>${pct(w.pct)}</span></button></li>`;
+  }
+
+  function searchSectionHTML() {
+    return `<section class="sec" role="search" aria-label="${tr('Search countries', 'Länder durchsuchen')}">
+        <label class="eyebrow" for="ov-q">${tr('Find a country', 'Land suchen')}</label>
+        <div class="sq-row">
+          <div class="sq-field">
+            <input id="ov-q" class="sq-input" type="search" value="${esc(S.q)}" placeholder="${tr('e.g. Austria, UK, Brasil', 'z. B. Österreich, UK, Brasil')}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-controls="ov-results" aria-describedby="ov-count">
+            <button type="button" class="sq-clear" id="ov-clear" aria-label="${tr('Clear search', 'Suche löschen')}"${S.q ? '' : ' hidden'}><span aria-hidden="true">×</span></button>
+          </div>
+          <span class="sq-count" id="ov-count">${LIST.length} ${tr('countries covered', 'Länder erfasst')}</span>
+        </div>
+        <p class="sr-only" role="status" id="ov-sr"></p>
+        <div id="ov-results" aria-live="off" hidden></div>
+      </section>`;
   }
 
   function overviewHTML() {
     const recent = LIST.map(c => ({ c, e: mainEl(c) })).sort((a, b) => b.e.d.localeCompare(a.e.d)).slice(0, 6);
     const recentRows = recent.map(({ c, e }) => {
       const w = winnerOf(e), col = pc(w.color);
-      return `<li><button type="button" class="row" data-open="${c.code}"><i class="bar6" style="background:${col}"></i><span><span class="row-t">${esc(c.n)}</span><span class="row-s">${esc(e.t)}${e.prelim ? tr(' · preliminary', ' · vorläufig') : ''}</span></span><span class="row-r"><b>${esc(w.short)} ${pct(w.pct)}</b>${dShort(e.d)}</span></button></li>`;
+      const st = statusLine(e, true);
+      return `<li><button type="button" class="row" data-open="${c.code}"><i class="bar6" style="${barBg(e, col)}"></i><span><span class="row-t">${esc(c.n)}</span><span class="row-s${st.length ? ' st' : ''}">${esc(shownTitle(e))}${st.length ? ' · ' + esc(st.join(' · ')) : ''}</span></span><span class="row-r"><b>${esc(w.short)} ${pct(w.pct)}</b>${dShort(e.d)}</span></button></li>`;
     }).join('');
     const up = (W.upcoming || []).map(([d, code, what]) => {
       const c = C[code];
@@ -770,29 +937,48 @@
     const groups = REG.map(([rk, rn, rnDe]) => {
       const cs = LIST.filter(c => c.reg === rk).sort((a, b) => a.n.localeCompare(b.n, LANG));
       if (!cs.length) return '';
-      return `<div class="grp"><div class="grp-h"><span>${tr(rn, rnDe)}</span><span>${cs.length}</span></div><ul class="rows">${cs.map(c => {
-        const e = mainEl(c);
-        if (S.mode === 'gov') {
-          const g = govParty(c);
-          return `<li><button type="button" class="row" data-open="${c.code}"><i class="bar6" style="background:${pc(g.color)}"></i><span><span class="row-t">${esc(c.n)}</span><span class="row-s">${esc(c.hog[1])}${g.id ? ' · ' + esc(g.short) : ''}</span></span><span class="row-r">${esc(c.hog[0].replace(/ \(.*\)/, ''))}</span></button></li>`;
-        }
-        const w = winnerOf(e);
-        return `<li><button type="button" class="row" data-open="${c.code}"><i class="bar6" style="background:${pc(w.color)}"></i><span><span class="row-t">${esc(c.n)}</span><span class="row-s">${esc(e.t)}</span></span><span class="row-r"><b>${esc(w.short)}</b>${pct(w.pct)}</span></button></li>`;
-      }).join('')}</ul></div>`;
+      return `<div class="grp"><div class="grp-h"><span>${tr(rn, rnDe)}</span><span>${cs.length}</span></div><ul class="rows">${cs.map(countryRowHTML).join('')}</ul></div>`;
     }).join('');
     return `<div class="pi">
       <section class="sec">
         <p class="eyebrow">${tr('Election Atlas', 'Wahlatlas')} · ${LIST.length} ${tr('countries', 'Länder')}</p>
-        <h1 class="big">${S.mode === 'win' ? tr('Who won last time?', 'Wer hat zuletzt gewonnen?') : tr('Who governs?', 'Wer regiert?')}</h1>
+        <h1 class="big">${S.mode === 'win' ? tr('Who came first last time?', 'Wer lag zuletzt vorn?') : tr('Who governs?', 'Wer regiert?')}</h1>
         <p class="lede">${S.mode === 'win'
-          ? tr('Each country is coloured by the largest party in its latest national election.', 'Jedes Land ist in der Farbe der stärksten Partei seiner letzten nationalen Wahl eingefärbt.')
+          ? tr('Each country is coloured by the largest party in its latest national election. Where a runoff is still pending, the country is hatched and shows the leader after the first round.', 'Jedes Land ist in der Farbe der stärksten Partei seiner letzten nationalen Wahl eingefärbt. Wo noch eine Stichwahl aussteht, ist das Land schraffiert und zeigt den Führenden nach dem ersten Wahlgang.')
           : tr('Each country is coloured by the party of its head of government. That is not always the election winner.', 'Jedes Land ist in der Farbe der Partei eingefärbt, die die Regierungschefin oder den Regierungschef stellt. Das ist nicht immer der Wahlsieger.')} ${tr('Click a country to see its seat distribution, result and government, plus the last three or four elections with a trend chart. Germany, the US, the UK, Canada, Austria, Poland, Brazil and Mexico also have regional maps.', 'Ein Klick öffnet Sitzverteilung, Ergebnis und Regierung, dazu die letzten drei bis vier Wahlen mit Verlaufsdiagramm. Für Deutschland, die USA, Großbritannien, Kanada, Österreich, Polen, Brasilien und Mexiko gibt es zusätzlich regionale Karten.')}</p>
       </section>
+      ${searchSectionHTML()}
+      <div class="ov-lists" id="ov-lists">
       <section class="sec"><p class="eyebrow">${tr('Recent elections', 'Zuletzt gewählt')}</p><ul class="rows">${recentRows}</ul></section>
       <section class="sec"><p class="eyebrow">${tr('Coming up', 'Demnächst')}</p><ul class="rows">${up}</ul></section>
-      <section class="sec"><p class="eyebrow">${tr('All countries', 'Alle Länder')} · ${S.mode === 'win' ? tr('election winner', 'Wahlsieger') : tr('head of government', 'Regierungsspitze')}</p>${groups}</section>
+      <section class="sec"><p class="eyebrow">${tr('All countries', 'Alle Länder')} · ${S.mode === 'win' ? tr('election result', 'Wahlergebnis') : tr('head of government', 'Regierungsspitze')}</p>${groups}</section>
+      </div>
       <section class="sec">${sourcesHTML()}</section>
     </div>`;
+  }
+
+  /* ---------- Sources and data status of the selected election ---------- */
+  // Only https links are rendered as links. `cur.src` belongs to the shown election; earlier elections and tabs
+  // without assigned sources fall back to a note that points to the general source paragraph.
+  const safeUrl = u => /^https:\/\//.test(u || '') ? u : null;
+  function srcLink(label, u) {
+    const url = safeUrl(u);
+    if (!url) return `<span>${esc(label)}</span>`;
+    return `<a class="sl" href="${esc(url)}" target="_blank" rel="noopener noreferrer"><span>${esc(label)}</span><span class="sl-i" aria-hidden="true">↗</span><span class="sr-only"> ${tr('(opens in a new tab)', '(öffnet in neuem Tab)')}</span></a>`;
+  }
+  function sourcesSectionHTML(cur) {
+    const s = cur.src;
+    const head = `<p class="eyebrow" id="srcsec-h">${tr('Sources and data status', 'Quellen und Datenstand')}</p>`;
+    if (!s) {
+      return `<section class="sec srcsec" aria-labelledby="srcsec-h">${head}<p class="note">${tr('No individual source has been assigned to this election yet. The general source note at the end of the page applies.', 'Für diese Wahl ist noch keine Einzelquelle zugeordnet. Es gilt der allgemeine Quellenhinweis am Ende der Seite.')}</p></section>`;
+    }
+    const off = s.official || [];
+    return `<section class="sec srcsec" aria-labelledby="srcsec-h">${head}<dl class="srcl">
+        <div><dt>${tr('Origin of the stored figures', 'Herkunft der gespeicherten Zahlen')}</dt><dd><p>${esc(s.origin.t)}</p>${s.origin.u ? srcLink(s.origin.l || s.origin.u, s.origin.u) : ''}</dd></div>
+        <div><dt>${off.length > 1 ? tr('Official reference sources', 'Amtliche Vergleichsquellen') : tr('Official reference source', 'Amtliche Vergleichsquelle')}</dt><dd>${off.map(o => `<div class="so">${srcLink(o.t, o.u)}<p class="sv">${esc(o.v)}</p></div>`).join('')}</dd></div>
+        ${s.note ? `<div><dt>${tr('Deviations and gaps', 'Abweichungen und Lücken')}</dt><dd><p>${esc(s.note)}</p></dd></div>` : ''}
+        <div><dt>${tr('Dates', 'Zeitangaben')}</dt><dd><p class="sd"><span>${tr('Election day', 'Wahltag')}: <b>${dLong(cur.d)}</b></span><span>${tr('Source check', 'Quellenprüfung')}: <b>${dLong(s.checked)}</b></span><span>${tr('General data status of this page', 'Allgemeiner Datenstand dieser Seite')}: <b>${dLong(W.stand)}</b></span></p></dd></div>
+      </dl></section>`;
   }
 
   function sourcesHTML() {
@@ -822,6 +1008,7 @@
       ${tabs ? `<section>${tabs}</section>` : ''}
       ${years}
       ${body}
+      ${sourcesSectionHTML(cur)}
       ${trend}
       ${govHTML(c, latest)}
       ${layersHTML(c)}
@@ -850,7 +1037,8 @@
     const rows = e.p.slice().sort((a, b) => hasV ? ((b[4] || -1) - (a[4] || -1)) || (b[5] - a[5]) : b[5] - a[5]);
     const maxV = Math.max(...e.p.map(p => p[4] || 0));
     const sumV = d3.sum(e.p, p => p[4] || 0);
-    const other = hasV && e.p.every(p => p[4] != null) ? 100 - sumV : (hasV ? null : null);
+    // A remainder row (100 − sum) is only derived when the data does not state its own percentage basis (e.pbase)
+    const other = hasV && !e.pbase && e.p.every(p => p[4] != null) ? 100 - sumV : null;
     const trs = rows.map(p => `<tr data-p="${p[0]}" class="${p[5] ? '' : 'dim'}"><td><div class="pn"><i class="sw" style="background:${pc(p[3])}"></i><div><b>${esc(p[1])}</b>${gov.has(p[0]) ? `<span class="gov-tag" title="${tr('in government', 'an der Regierung beteiligt')}">${tr('GOV', 'REG')}</span>` : ''}<small>${esc(p[2])}</small></div></div></td>`
       + (hasV ? `<td class="num">${p[4] != null ? pct(p[4]) : '–'}${p[4] != null ? `<div class="vbar" style="width:${Math.max(3, 48 * p[4] / maxV)}px;background:${pc(p[3])}"></div>` : ''}</td>` : '')
       + `<td class="num"><b>${p[5]}</b></td><td class="num">${chg(p[6])}</td></tr>`).join('')
@@ -858,20 +1046,22 @@
     const winLabel = hasV ? (e.vl ? tr('Largest party · ', 'Stärkste Kraft · ') + e.vl : tr('Largest party', 'Stärkste Kraft')) : tr('Largest group', 'Größte Fraktion');
     const winVal = hasV ? pct(w.pct) : w.seats;
     const winSub = `${w.name}${hasV ? ' · ' + w.seats + tr(' of ', ' von ') + int(e.seats) + tr(' seats', ' Sitzen') : ''}`;
-    return `${e.prelim ? `<section><span class="badge warn">${tr('preliminary result', 'vorläufiges Ergebnis')}</span></section>` : ''}
+    return `${statusBadges(e)}
       <section>${factsHTML(e, seatsFact)}</section>
       <section>${winnerBox(winLabel, w.short, winSub, w.color, winVal)}</section>
       <section class="sec"><p class="eyebrow">${tr('Seats', 'Sitzverteilung')} · ${esc(e.ch)}</p><figure class="hemi" id="hemi">${hemicycle(parties, e.seats, gov)}</figure>
         <p class="cap">${tr('Groups arranged from left to right by political orientation.', 'Fraktionen von links nach rechts nach politischer Ausrichtung angeordnet.')}</p></section>
       <section class="sec"><p class="eyebrow">${tr('Result', 'Ergebnis')}</p><div class="tbl-wrap"><table class="res"><thead><tr><th>${tr('Party', 'Partei')}</th>${hasV ? `<th>${esc(e.vl || tr('Votes', 'Stimmen'))}</th>` : ''}<th>${tr('Seats', 'Sitze')}</th><th>±</th></tr></thead><tbody>${trs}</tbody></table></div>
-        ${e.note ? `<p class="note" style="margin-top:10px">${esc(e.note)}</p>` : ''}</section>`;
+        ${e.note ? `<p class="note" style="margin-top:10px">${esc(e.note)}</p>` : ''}
+        ${e.pbase ? `<p class="note pbase" style="margin-top:10px">${esc(e.pbase)}</p>` : ''}</section>`;
   }
 
   function presHTML(c, e) {
     const w = winnerOf(e);
     const r2 = e.c.some(x => x[5] != null);
     const sorted = e.c.slice().sort((a, b) => r2 ? ((b[5] || -1) - (a[5] || -1)) || (b[4] - a[4]) : b[4] - a[4]);
-    const finalLabel = r2 ? tr('Runoff', 'Stichwahl') : (c.code === 'BRA' && !e.hist ? tr('1st round', '1. Wahlgang') : tr('Result', 'Ergebnis'));
+    const open = isOpen(e);
+    const finalLabel = r2 ? tr('Runoff', 'Stichwahl') : (open ? tr('1st round', '1. Wahlgang') : tr('Result', 'Ergebnis'));
     let evBlock = '';
     if (e.ev) {
       const tot = e.ev.rep + e.ev.dem;
@@ -886,12 +1076,12 @@
       const fin = r2 ? x[5] : x[4];
       const isW = x[0] === w.id && x[1] === w.name;
       const v = fin != null ? fin : x[4];
-      return `<div class="cd" data-p="${x[0]}"><div class="cd-n">${isW ? '✓ ' : ''}${esc(x[1])}<small>${esc(x[2])}</small></div><div class="cd-p num">${pct(v)}</div>
+      return `<div class="cd" data-p="${x[0]}"><div class="cd-n">${isW && !open ? '✓ ' : ''}${esc(x[1])}<small>${esc(x[2])}</small></div><div class="cd-p num">${pct(v)}</div>
         <div class="cd-b"><i style="width:${v}%;background:${pc(x[3])}"></i></div>${r2 ? `<div class="cd-r1">${tr('1st round', '1. Wahlgang')}: ${pct(x[4])}${fin == null ? tr(' · eliminated', ' · ausgeschieden') : ''}</div>` : ''}</div>`;
     }).join('');
-    const sub = `${w.party} · ${finalLabel}`;
-    return `<section>${factsHTML(e, `<div class="fact"><div class="fact-k">${tr('Format', 'Art')}</div><div class="fact-v" style="font-size:16px">${r2 ? tr('Two rounds', 'Zwei Wahlgänge') : (c.code === 'BRA' ? tr('1st round', '1. Wahlgang') : tr('One round', 'Ein Wahlgang'))}</div></div>`)}</section>
-      <section>${winnerBox(c.code === 'BRA' && !r2 ? tr('Leading after the 1st round', 'Vorn nach dem 1. Wahlgang') : tr('Elected', 'Gewählt'), w.name, sub, w.color, pct(w.pct))}</section>
+    const sub = open ? `${w.party} · ${tr('runoff on ', 'Stichwahl am ')}${dLong(e.runoffDue)}` : `${w.party} · ${finalLabel}`;
+    return `${statusBadges(e)}<section>${factsHTML(e, `<div class="fact"><div class="fact-k">${tr('Format', 'Art')}</div><div class="fact-v" style="font-size:16px">${r2 ? tr('Two rounds', 'Zwei Wahlgänge') : (open ? tr('1st round', '1. Wahlgang') : tr('One round', 'Ein Wahlgang'))}</div></div>`)}</section>
+      <section>${winnerBox(open ? tr('Leading after the 1st round', 'Führt nach dem 1. Wahlgang') : tr('Elected', 'Gewählt'), w.name, sub, w.color, pct(w.pct))}</section>
       ${evBlock}
       <section class="sec"><p class="eyebrow">${tr('Result', 'Ergebnis')} · ${finalLabel}</p><div class="cand">${list}</div>
         ${e.note ? `<p class="note" style="margin-top:12px">${esc(e.note)}</p>` : ''}</section>`;
@@ -947,7 +1137,7 @@
       const tot = a[k] + (b ? b[k] : 0);
       return `<button type="button" class="pt" data-yr="${i}" aria-pressed="${i === S.yr}"><span class="pt-y">${esc(yearLbl(list, i))}</span><span class="pt-m"><span class="pt-bar"><i style="width:${(100 * a[k] / tot).toFixed(1)}%;background:${pc(a[3])}"></i><i style="flex:1;background:${b ? pc(b[3]) : 'var(--chip)'}"></i></span><span class="pt-t"><b>${esc(a[1])}</b> ${pct(a[k])}${b ? ' · ' + esc(b[1]) + ' ' + pct(b[k]) : ''}</span></span></button>`;
     }).join('');
-    return `<section class="sec"><p class="eyebrow">${tr('Trend', 'Verlauf')} · ${list.length} ${tr('presidential elections', 'Präsidentschaftswahlen')}</p><div class="ptl">${rows}</div><p class="cap">${tr('Winner and runner-up in the deciding round. Click to switch elections.', 'Sieger und Zweitplatzierter im entscheidenden Wahlgang. Klick wechselt die Wahl.')}</p></section>`;
+    return `<section class="sec"><p class="eyebrow">${tr('Trend', 'Verlauf')} · ${list.length} ${tr('presidential elections', 'Präsidentschaftswahlen')}</p><div class="ptl">${rows}</div><p class="cap">${tr('Winner and runner-up in the deciding round. Click to switch elections.', 'Sieger und Zweitplatzierter im entscheidenden Wahlgang. Klick wechselt die Wahl.')}${isOpen(list[0]) ? ' ' + tr(`The ${yearLbl(list, 0)} election is not decided yet: the two leaders after the 1st round are shown.`, `Die Wahl ${yearLbl(list, 0)} ist noch nicht entschieden: gezeigt sind die beiden Führenden nach dem 1. Wahlgang.`) : ''}</p></section>`;
   }
 
   function govHTML(c, latest) {
@@ -971,7 +1161,7 @@
   }
 
   function layersHTML(c) {
-    if (!c.sub || !SUBDEF[c.sub]) return `<section class="sec"><p class="eyebrow">${tr('Map', 'Karte')}</p><p class="note">${tr(`No regional results are available for ${esc(c.n)}. The map shows the country in the winner’s colour and its neighbours faded.`, `Für ${esc(c.n)} sind keine regionalen Ergebnisse hinterlegt. Die Karte zeigt das Land in der Farbe des Wahlsiegers, die Nachbarländer blass.`)}</p></section>`;
+    if (!c.sub || !SUBDEF[c.sub]) return `<section class="sec"><p class="eyebrow">${tr('Map', 'Karte')}</p><p class="note">${tr(`No regional results are available for ${esc(c.n)}. The map shows the country in the colour of its election result and its neighbours faded.`, `Für ${esc(c.n)} sind keine regionalen Ergebnisse hinterlegt. Die Karte zeigt das Land in der Farbe des Wahlergebnisses, die Nachbarländer blass.`)}</p></section>`;
     const def = SUBDEF[c.sub], live = DV.c === c && DV.L, cur = live ? DV.L.id : S.layer;
     const off = l => live && !DV.noData && !layerOk(l, DV.data);
     const seg = def.layers.length > 1 ? `<div class="seg" role="group" aria-label="${tr('Map layer', 'Kartenebene')}">${def.layers.map(l => `<button type="button" id="ly-${l.id}" data-layer="${l.id}" aria-pressed="${l.id === cur}"${off(l) ? ` disabled title="${tr('Not available for this election', 'Für diese Wahl nicht verfügbar')}"` : ''}>${esc(tx(l.label))}</button>`).join('')}</div>` : `<p class="note"><b style="color:var(--ink)">${esc(tx(def.layers[0].label))}</b></p>`;
@@ -1023,6 +1213,7 @@
     if (mEl) { S.metric = mEl.dataset.metric; rerender(); return; }
     const t = ev.target.closest('button, input'); if (!t) return;
     if (t.dataset.open) { openCountry(t.dataset.open); return; }
+    if (t.id === 'ov-clear' || t.dataset.sqClear != null) { clearSearch(true); return; }
     if (t.id === 'close') { closeCountry(); return; }
     if (t.id === 'rclose') { clearRegion(); return; }
     if (t.dataset.el != null) { S.el = +t.dataset.el; S.yr = 0; renderPanel(); syncMapYear(); return; }
@@ -1045,10 +1236,27 @@
     const s = ev.target.closest('[data-s]'); hlSeries(s ? s.dataset.s : null);
   });
   panel.addEventListener('mouseleave', () => { hl(null); hlSeries(null); });
+  panel.addEventListener('input', ev => { if (ev.target.id === 'ov-q') { S.q = ev.target.value; updateSearch(true); } });
   panel.addEventListener('keydown', ev => {
+    const tg = ev.target, hits = () => [...panel.querySelectorAll('#ov-results .row')];
+    if (tg.id === 'ov-q') {                                    // Esc clears, ↓ jumps to the hits, Enter opens a single hit
+      if (ev.key === 'Escape' && S.q) { ev.preventDefault(); clearSearch(true); }
+      else if (ev.key === 'ArrowDown' || ev.key === 'Enter') { const r = hits(); if (r.length) { ev.preventDefault(); if (ev.key === 'Enter' && r.length === 1) r[0].click(); else r[0].focus(); } }
+    } else if (tg.classList && tg.classList.contains('row') && tg.closest('#ov-results')) {
+      const r = hits(), i = r.indexOf(tg);
+      if (ev.key === 'ArrowDown' && i < r.length - 1) { ev.preventDefault(); r[i + 1].focus(); }
+      else if (ev.key === 'ArrowUp') { ev.preventDefault(); (i > 0 ? r[i - 1] : document.getElementById('ov-q')).focus(); }
+    }
     if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('[data-yr][role="button"]')) { ev.preventDefault(); ev.target.dispatchEvent(new MouseEvent('click', { bubbles: true })); }
   });
 
+  legend.addEventListener('click', ev => {
+    const b = ev.target.closest('.lg-toggle'); if (!b) return;
+    S.lgOpen = !S.lgOpen;                                      // updated in place so keyboard focus stays on the button
+    legend.classList.toggle('is-open', S.lgOpen);
+    b.setAttribute('aria-expanded', String(S.lgOpen));
+    b.querySelector('.lg-lbl').textContent = S.lgOpen ? tr('Hide legend', 'Legende ausblenden') : tr('Show legend', 'Legende anzeigen');
+  });
   document.getElementById('langs').addEventListener('click', ev => { const b = ev.target.closest('button'); if (b) setLang(b.dataset.lang); });
   document.getElementById('presets').addEventListener('click', ev => { const b = ev.target.closest('button'); if (b) goPreset(b.dataset.preset); });
   document.getElementById('modes').addEventListener('click', ev => {

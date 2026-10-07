@@ -101,12 +101,25 @@ button { font: inherit; color: inherit; }
 .zoomctl button { width: 34px; height: 34px; border: 0; background: transparent; font-size: 18px; font-weight: 600; cursor: pointer; display: grid; place-items: center; }
 .zoomctl button + button { border-top: 1px solid var(--rule); }
 .zoomctl button:hover { background: var(--chip); }
-.legend { left: 12px; bottom: 12px; max-width: min(360px, calc(100% - 70px)); background: color-mix(in srgb, var(--sheet) 94%, transparent); border: 1px solid var(--rule); border-radius: 9px; padding: 9px 12px 10px; font-size: 12px; line-height: 1.35; box-shadow: var(--shadow); backdrop-filter: blur(6px); }
+/* Legend: a grid item sharing the map's cell (overlay card, bottom left) on wide screens; its own row below the map on phones */
+.map, .legend { grid-column: 1; grid-row: 1; }
+.panel { grid-column: 2; grid-row: 1; }
+.legend { align-self: end; justify-self: start; position: relative; z-index: 4; margin: 0 0 12px 12px; max-width: min(360px, calc(100% - 70px)); background: color-mix(in srgb, var(--sheet) 94%, transparent); border: 1px solid var(--rule); border-radius: 9px; padding: 9px 12px 10px; font-size: 12px; line-height: 1.35; box-shadow: var(--shadow); backdrop-filter: blur(6px); }
+.lg-flag, .lg-toggle { display: none; }
+.lg-flag { margin: 0; color: var(--ink-2); align-items: flex-start; gap: 6px; }
+.lg-flag .sw { margin-top: 2px; }
+.lg-toggle { align-items: center; gap: 8px; min-height: 44px; min-width: 44px; padding: 0 14px; margin: 4px 0 0; border: 1px solid var(--rule); border-radius: 8px; background: var(--sheet); color: var(--ink); font: 600 13px/1.2 var(--f-text); cursor: pointer; }
+.lg-toggle:hover { border-color: var(--ink-3); }
+.lg-chev { width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform .15s; }
+.lg-toggle[aria-expanded="true"] .lg-chev { transform: translateY(2px) rotate(-135deg); }
 .legend-t { font-weight: 700; font-size: 12px; margin: 0 0 6px; }
 .legend-s { color: var(--ink-2); margin: 6px 0 0; }
 .lg-items { display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .lg-items span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.lg-items span.wrap { white-space: normal; align-items: flex-start; }
+.lg-items span.wrap .sw { margin-top: 2px; }
 .sw { display: inline-block; width: 11px; height: 11px; border-radius: 2.5px; flex: none; box-shadow: inset 0 0 0 1px rgba(127, 127, 127, .25); }
+.sw.hatch { background: repeating-linear-gradient(45deg, var(--ink-3) 0 2.5px, var(--land) 2.5px 5.5px); }
 .ramp { display: flex; align-items: center; gap: 6px; margin-top: 7px; color: var(--ink-2); }
 .ramp i { display: inline-block; width: 64px; height: 8px; border-radius: 2px; }
 .loading { top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--sheet); border: 1px solid var(--rule); padding: 10px 14px; border-radius: 8px; font-weight: 600; box-shadow: var(--shadow); }
@@ -119,6 +132,7 @@ button { font: inherit; color: inherit; }
 .tip-row b { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tip-bar { grid-column: 2 / 4; height: 3px; border-radius: 2px; margin-top: -1px; }
 .tip-n { color: var(--ink-2); font-size: 11.5px; margin-top: 6px; }
+.tip-st { font-weight: 700; font-size: 12px; margin-top: 4px; }
 
 /* ---------- Dossier panel ---------- */
 .panel { overflow-y: auto; background: var(--sheet); border-left: 1px solid var(--rule); min-width: 0; overscroll-behavior: contain; }
@@ -135,6 +149,7 @@ h1.big { margin: 0; font: 820 30px/1.05 var(--f-display); font-stretch: 112%; le
 .row .bar6 { width: 6px; height: 28px; border-radius: 2px; }
 .row-t { font-weight: 650; display: block; }
 .row-s { color: var(--ink-2); font-size: 12.5px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-s.st { white-space: normal; }
 .row-r { text-align: right; font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
 .row-r b { display: block; color: var(--ink); font-size: 14px; font-stretch: 85%; }
 .grp + .grp { margin-top: 14px; }
@@ -155,6 +170,7 @@ h1.big { margin: 0; font: 820 30px/1.05 var(--f-display); font-stretch: 112%; le
 .fact-v small { display: block; font-size: 12px; font-weight: 500; color: var(--ink-2); font-stretch: 95%; margin-top: 1px; }
 .badge { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: var(--chip); color: var(--ink-2); vertical-align: middle; }
 .badge.warn { background: color-mix(in srgb, #E8A100 22%, var(--sheet)); color: var(--ink); }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .winner { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 10px; background: var(--chip); }
 .winner .wsw { width: 10px; align-self: stretch; border-radius: 3px; flex: none; }
@@ -273,15 +289,52 @@ table.res { width: 100%; border-collapse: collapse; font-size: 13px; }
 .pt-t { font-size: 12px; color: var(--ink-2); }
 .pt-t b { color: var(--ink); }
 
+/* ---------- sources and data status ---------- */
+.srcl { margin: 0; display: grid; gap: 14px; }
+.srcl dt { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+.srcl dd { margin: 3px 0 0; font-size: 13px; }
+.srcl p { margin: 0; }
+.srcl dd > p + a.sl { margin-top: 2px; }
+a.sl { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 2px 0; color: var(--ink); font-weight: 650; text-decoration: underline; text-decoration-color: var(--ink-3); text-underline-offset: 3px; }
+a.sl:hover { text-decoration-color: var(--ink); }
+.sl-i { color: var(--ink-3); font-size: 12px; flex: none; }
+.so + .so { margin-top: 6px; }
+.sv { color: var(--ink-2); font-size: 12.5px; }
+.sd { display: grid; gap: 2px; color: var(--ink-2); }
+.sd b { color: var(--ink); font-weight: 650; }
+
+/* ---------- country search ---------- */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+label.eyebrow { display: block; }
+.ov-lists { display: flex; flex-direction: column; gap: 22px; }
+.ov-lists > .sec:first-child { border-top: 1px solid var(--rule); padding-top: 14px; }
+.sq-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.sq-field { position: relative; flex: 1 1 190px; min-width: 0; }
+.sq-input { width: 100%; height: 44px; padding: 0 44px 0 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font: 500 16px var(--f-text); -webkit-appearance: none; appearance: none; }
+.sq-input::placeholder { color: var(--ink-3); }
+.sq-input::-webkit-search-cancel-button, .sq-input::-webkit-search-decoration { -webkit-appearance: none; display: none; }
+.sq-input:hover { border-color: var(--ink-3); }
+.sq-clear { position: absolute; right: 0; top: 0; width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); font-size: 22px; line-height: 1; cursor: pointer; }
+.sq-clear:hover { color: var(--ink); }
+.sq-count { font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+#ov-results { margin-top: 14px; }
+.sq-empty { margin: 0 0 10px; }
+.sq-clear-btn { min-height: 44px; box-shadow: none; }
+
 @media (max-width: 860px) {
   html, body { height: auto; }
   .app { height: auto; min-height: 100%; }
   .top { padding: 10px 16px; }
   .stage { grid-template-columns: minmax(0, 1fr); }
-  .map { height: 62vh; height: 62svh; min-height: 330px; }
-  .panel { border-left: 0; border-top: 1px solid var(--rule); overflow: visible; }
+  .map { height: 62vh; height: 62svh; min-height: 330px; grid-row: 1; }
+  .legend { grid-row: 2; align-self: stretch; justify-self: stretch; margin: 0; max-width: none; border-radius: 0; border-width: 1px 0 0; box-shadow: none; backdrop-filter: none; background: var(--sheet); padding: 10px 16px 10px; font-size: 12.5px; }
+  .panel { grid-column: 1; grid-row: 3; border-left: 0; border-top: 1px solid var(--rule); overflow: visible; }
   .pi { padding: 18px 16px 28px; }
-  .legend { font-size: 11.5px; max-width: calc(100% - 64px); }
+  .lg-flag { display: flex; margin-top: 4px; }
+  .lg-toggle { display: inline-flex; }
+  .lg-body { display: none; margin-top: 8px; }
+  .legend.is-open .lg-body { display: block; }
+  .lg-only-wide { display: none !important; }
   .controls { width: 100%; }
   .ctl-label { display: none; }
   h1.big { font-size: 26px; }
@@ -317,7 +370,7 @@ table.res { width: 100%; border-collapse: collapse; font-size: 13px; }
       <div class="ctl">
         <span class="ctl-label" id="lbl-mode">Colour</span>
         <div class="seg" id="modes" role="group" aria-labelledby="lbl-mode">
-          <button type="button" id="mode-win" data-mode="win" aria-pressed="true">Election winner</button>
+          <button type="button" id="mode-win" data-mode="win" aria-pressed="true">Election result</button>
           <button type="button" id="mode-gov" data-mode="gov" aria-pressed="false">Government</button>
         </div>
       </div>
@@ -338,7 +391,6 @@ table.res { width: 100%; border-collapse: collapse; font-size: 13px; }
         <button type="button" class="btn" id="back">← World map</button>
         <span class="crumb-t" id="crumb-t"></span>
       </div>
-      <div class="overlay legend" id="legend"></div>
       <div class="overlay zoomctl">
         <button type="button" id="zin" aria-label="Zoom in">+</button>
         <button type="button" id="zout" aria-label="Zoom out">−</button>
@@ -347,6 +399,7 @@ table.res { width: 100%; border-collapse: collapse; font-size: 13px; }
       <div class="overlay loading" id="loading" hidden>Loading regional data …</div>
       <div class="tip" id="tip" hidden></div>
     </section>
+    <div class="legend" id="legend" role="group" aria-label="Legend"></div>
     <aside class="panel" id="panel" aria-live="polite"></aside>
   </main>
 </div>
