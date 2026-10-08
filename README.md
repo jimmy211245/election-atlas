@@ -3,8 +3,9 @@
 Interaktive Weltkarte der letzten nationalen Wahlergebnisse in 46 Ländern (EU, USA, Kanada, Türkei u. a.), auf Deutsch und Englisch.
 
 - Länder eingefärbt nach Wahlsieger oder nach Partei der Regierungsspitze
-- Sitzverteilung als Halbkreis, Ergebnistabelle, Regierung
-- frühere Wahlen (meist die letzten drei bis vier) mit Verlaufsdiagramm
+- Ländersuche in der Kopfzeile (Strg+K oder /)
+- Länderansicht mit Reitern: Ergebnis (Sitzbalken, Ergebniszeilen), Verlauf, Regierung, Karte, Quellen
+- frühere Wahlen (meist die letzten drei bis vier) als Zeitleiste mit Verlaufsdiagramm
 - Regionalkarten für Deutschland (Wahlkreise, Bundesländer), USA (Bundesstaaten, Counties), Großbritannien, Kanada, Österreich, Polen, Brasilien und Mexiko
 
 Datenstand: 5. Oktober 2026.

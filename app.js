@@ -767,6 +767,9 @@
     aria('#map', tr('Interactive map of election results', 'Interaktive Karte der Wahlergebnisse'));
     aria('#world', tr('World map coloured by election result', 'Weltkarte, eingefärbt nach Wahlergebnis'));
     aria('#detail', tr('Detail map of the selected country', 'Detailkarte des gewählten Landes'));
+    set('#q-lbl', tr('Search countries', 'Länder durchsuchen')); aria('#hsearch', tr('Country search', 'Ländersuche')); aria('#q-clear', tr('Clear search', 'Suche löschen'));
+    document.getElementById('q').placeholder = tr('Find a country …', 'Land suchen …');
+    set('#q-kbd', /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : tr('Ctrl K', 'Strg K'));
     aria('#zin', tr('Zoom in', 'Hineinzoomen')); aria('#zout', tr('Zoom out', 'Herauszoomen')); aria('#zhome', tr('Reset view', 'Ansicht zurücksetzen'));
     renderLangs();
   }
@@ -798,40 +801,13 @@
   /* ================================================================
      Charts
      ================================================================ */
-  function hemicycle(parties, total, govSet, opts) {
-    opts = opts || {};
-    const Wd = 380, R = 178, cx = Wd / 2, cy = R + 14, Hd = cy + 8;
-    const r0 = total > 400 ? 0.38 : total > 150 ? 0.33 : total > 60 ? 0.3 : 0.26;
-    const rows = Math.max(2, Math.ceil(Math.sqrt(2 * total * (1 - r0) / (Math.PI * (1 + r0)))));
-    const radii = d3.range(rows).map(i => r0 + (1 - r0) * (i + 0.5) / rows);
-    const sumR = d3.sum(radii);
-    const raw = radii.map(r => total * r / sumR);
-    const n = raw.map(Math.floor); let rem = total - d3.sum(n);
-    raw.map((v, i) => [v - n[i], i]).sort((a, b) => b[0] - a[0]).slice(0, rem).forEach(([, i]) => n[i]++);
-    const seats = [];
-    radii.forEach((rr, i) => { const m = n[i]; for (let j = 0; j < m; j++) seats.push({ a: m === 1 ? Math.PI / 2 : Math.PI * (1 - j / (m - 1)), r: rr }); });
-    seats.sort((p, q) => q.a - p.a || p.r - q.r);
-    let idx = 0; for (const p of parties) for (let s = 0; s < p.seats && idx < seats.length; s++) seats[idx++].p = p;
-    const rowGap = (1 - r0) / rows * R;
-    const arcGap = Math.min(...radii.map((rr, i) => n[i] > 1 ? Math.PI * rr * R / (n[i] - 1) : 99));
-    const dot = Math.max(1.2, Math.min(rowGap, arcGap) * 0.42);
-    const circles = seats.filter(s => s.p).map(s => {
-      const x = cx + Math.cos(s.a) * s.r * R, y = cy - Math.sin(s.a) * s.r * R;
-      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${dot.toFixed(2)}" fill="${pc(s.p.color)}" data-p="${s.p.id}"><title>${esc(s.p.short)}: ${s.p.seats} ${tr('seats', 'Sitze')}</title></circle>`;
-    }).join('');
-    const maj = opts.majority || Math.floor(total / 2) + 1;
-    const majMark = `<line class="hemi-m" x1="${cx}" x2="${cx}" y1="${cy - R - 10}" y2="${cy - r0 * R + 6}"></line><text class="hemi-ml" x="${cx + 5}" y="${cy - R - 3}">${tr('Majority', 'Mehrheit')} ${int(maj)}</text>`;
-    return `<svg viewBox="0 -12 ${Wd} ${Hd + 12}" role="img" aria-label="${tr('Seat distribution', 'Sitzverteilung')}: ${parties.map(p => p.short + ' ' + p.seats).join(', ')}">`
-      + majMark + circles
-      + `<text class="hemi-t" x="${cx}" y="${cy - 16}" text-anchor="middle">${int(total)}</text>`
-      + `<text class="hemi-s" x="${cx}" y="${cy - 1}" text-anchor="middle">${esc(opts.unit || tr('seats', 'Sitze'))}</text></svg>`;
-  }
 
   /* ================================================================
      Panel
      ================================================================ */
   function renderPanel() {
-    if (!S.country) { panel.innerHTML = overviewHTML(); updateSearch(false); return; }
+    updateSearch(false);                                   // keeps an open search popup in the current language and mode
+    if (!S.country) { panel.innerHTML = overviewHTML(); return; }
     panel.innerHTML = countryHTML(C[S.country]);
     const yr = panel.querySelector('.yr[aria-pressed="true"]');
     if (yr) yr.parentElement.scrollLeft = yr.offsetLeft - (yr.parentElement.clientWidth - yr.offsetWidth) / 2;
@@ -888,25 +864,52 @@
     }
     return `<p class="eyebrow">${hitCount(res.length)} · ${S.mode === 'win' ? tr('election result', 'Wahlergebnis') : tr('head of government', 'Regierungsspitze')}</p><ul class="rows">${res.map(countryRowHTML).join('')}</ul>`;
   }
-  let srTimer;
-  // Updates only the results area (the input keeps focus and cursor); `announce` sends the hit count to screen readers, debounced
+  let srTimer, popOpen = false;
+  const qIn = document.getElementById('q'), qPop = document.getElementById('q-pop'), qSr = document.getElementById('q-sr'), qBox = document.getElementById('hsearch');
+  // Updates only the results popup (the input keeps focus and cursor); `announce` sends the hit count to screen readers, debounced
   function updateSearch(announce) {
-    const input = document.getElementById('ov-q'); if (!input) return;
-    const box = document.getElementById('ov-results'), lists = document.getElementById('ov-lists'), sr = document.getElementById('ov-sr');
     const q = S.q.trim();
-    document.getElementById('ov-clear').hidden = !S.q;
+    document.getElementById('q-clear').hidden = !S.q;
+    document.getElementById('q-kbd').hidden = !!S.q;
     clearTimeout(srTimer);
-    if (!q) { box.hidden = true; box.innerHTML = ''; lists.hidden = false; if (!announce) sr.textContent = ''; return; }
+    if (!q || !popOpen) { qPop.hidden = true; qPop.innerHTML = ''; if (!announce) qSr.textContent = ''; return; }
     const res = searchCountries(q);
-    lists.hidden = true; box.hidden = false; box.innerHTML = searchBodyHTML(q, res);
-    if (announce) srTimer = setTimeout(() => { sr.textContent = res.length ? hitCount(res.length) : tr('No results', 'Keine Treffer'); }, 500);
+    qPop.hidden = false; qPop.innerHTML = searchBodyHTML(q, res);
+    if (announce) srTimer = setTimeout(() => { qSr.textContent = res.length ? hitCount(res.length) : tr('No results', 'Keine Treffer'); }, 500);
   }
   function clearSearch(focus) {
-    S.q = ''; const input = document.getElementById('ov-q'); if (input) input.value = '';
+    S.q = ''; qIn.value = '';
     updateSearch(false);
-    const sr = document.getElementById('ov-sr'); if (sr) sr.textContent = tr('Search cleared', 'Suche gelöscht');
-    if (focus && input) input.focus();
+    qSr.textContent = tr('Search cleared', 'Suche gelöscht');
+    if (focus) qIn.focus();
   }
+  const closePop = () => { popOpen = false; updateSearch(false); };
+  qIn.addEventListener('input', () => { S.q = qIn.value; popOpen = true; updateSearch(true); });
+  qIn.addEventListener('focus', () => { if (S.q.trim()) { popOpen = true; updateSearch(false); } });
+  qBox.addEventListener('click', ev => {
+    const t = ev.target.closest('button'); if (!t) return;
+    if (t.dataset.open) { const code = t.dataset.open; S.q = ''; qIn.value = ''; closePop(); qIn.blur(); openCountry(code); return; }
+    if (t.id === 'q-clear' || t.dataset.sqClear != null) clearSearch(true);
+  });
+  qBox.addEventListener('keydown', ev => {
+    const hits = () => [...qPop.querySelectorAll('.row')];
+    if (ev.target === qIn) {                                   // Esc clears (or closes), ↓ jumps to the hits, Enter opens a single hit
+      if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); if (S.q) clearSearch(true); else { closePop(); qIn.blur(); } }
+      else if (ev.key === 'ArrowDown' || ev.key === 'Enter') { const r = hits(); if (r.length) { ev.preventDefault(); if (ev.key === 'Enter' && r.length === 1) r[0].click(); else r[0].focus(); } }
+    } else if (ev.target.classList.contains('row')) {
+      const r = hits(), i = r.indexOf(ev.target);
+      if (ev.key === 'ArrowDown' && i < r.length - 1) { ev.preventDefault(); r[i + 1].focus(); }
+      else if (ev.key === 'ArrowUp') { ev.preventDefault(); (i > 0 ? r[i - 1] : qIn).focus(); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); qIn.focus(); closePop(); }
+    }
+  });
+  document.addEventListener('pointerdown', ev => { if (popOpen && !qBox.contains(ev.target)) closePop(); });
+  qBox.addEventListener('focusout', ev => { if (popOpen && ev.relatedTarget && !qBox.contains(ev.relatedTarget)) closePop(); });
+  // Ctrl+K / ⌘K, or "/" outside text fields, jumps to the search
+  document.addEventListener('keydown', ev => {
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName);
+    if (((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') || (ev.key === '/' && !typing)) { ev.preventDefault(); qIn.focus(); qIn.select(); }
+  });
 
   // One country row of the "All countries" list, in the current mode (also used for search hits)
   function countryRowHTML(c) {
@@ -919,20 +922,6 @@
     return `<li><button type="button" class="row" data-open="${c.code}"><i class="bar6" style="${barBg(e, pc(w.color))}"></i><span><span class="row-t">${esc(c.n)}</span><span class="row-s${st.length ? ' st' : ''}">${esc(shownTitle(e))}${st.length ? ' · ' + esc(st.join(' · ')) : ''}</span></span><span class="row-r"><b>${esc(w.short)}</b>${pct(w.pct)}</span></button></li>`;
   }
 
-  function searchSectionHTML() {
-    return `<section class="sec" role="search" aria-label="${tr('Search countries', 'Länder durchsuchen')}">
-        <label class="eyebrow" for="ov-q">${tr('Find a country', 'Land suchen')}</label>
-        <div class="sq-row">
-          <div class="sq-field">
-            <input id="ov-q" class="sq-input" type="search" value="${esc(S.q)}" placeholder="${tr('e.g. Austria, UK, Brasil', 'z. B. Österreich, UK, Brasil')}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-controls="ov-results" aria-describedby="ov-count">
-            <button type="button" class="sq-clear" id="ov-clear" aria-label="${tr('Clear search', 'Suche löschen')}"${S.q ? '' : ' hidden'}><span aria-hidden="true">×</span></button>
-          </div>
-          <span class="sq-count" id="ov-count">${LIST.length} ${tr('countries covered', 'Länder erfasst')}</span>
-        </div>
-        <p class="sr-only" role="status" id="ov-sr"></p>
-        <div id="ov-results" aria-live="off" hidden></div>
-      </section>`;
-  }
 
   function overviewHTML() {
     const recent = LIST.map(c => ({ c, e: mainEl(c) })).sort((a, b) => b.e.d.localeCompare(a.e.d)).slice(0, 6);
@@ -958,12 +947,9 @@
           ? tr('Each country is coloured by the largest party in its latest national election. Where a runoff is still pending, the country is hatched and shows the leader after the first round.', 'Jedes Land ist in der Farbe der stärksten Partei seiner letzten nationalen Wahl eingefärbt. Wo noch eine Stichwahl aussteht, ist das Land schraffiert und zeigt den Führenden nach dem ersten Wahlgang.')
           : tr('Each country is coloured by the party of its head of government. That is not always the election winner.', 'Jedes Land ist in der Farbe der Partei eingefärbt, die die Regierungschefin oder den Regierungschef stellt. Das ist nicht immer der Wahlsieger.')} ${tr('Click a country to see its seat distribution, result and government, plus the last three or four elections with a trend chart. Germany, the US, the UK, Canada, Austria, Poland, Brazil and Mexico also have regional maps.', 'Ein Klick öffnet Sitzverteilung, Ergebnis und Regierung, dazu die letzten drei bis vier Wahlen mit Verlaufsdiagramm. Für Deutschland, die USA, Großbritannien, Kanada, Österreich, Polen, Brasilien und Mexiko gibt es zusätzlich regionale Karten.')}</p>
       </section>
-      ${searchSectionHTML()}
-      <div class="ov-lists" id="ov-lists">
       <section class="sec"><p class="eyebrow">${tr('Recent elections', 'Zuletzt gewählt')}</p><ul class="rows">${recentRows}</ul></section>
       <section class="sec"><p class="eyebrow">${tr('Coming up', 'Demnächst')}</p><ul class="rows">${up}</ul></section>
       <section class="sec"><p class="eyebrow">${tr('All countries', 'Alle Länder')} · ${S.mode === 'win' ? tr('election result', 'Wahlergebnis') : tr('head of government', 'Regierungsspitze')}</p>${groups}</section>
-      </div>
       <section class="sec">${sourcesHTML()}</section>
     </div>`;
   }
@@ -1046,28 +1032,31 @@
   function parlHTML(c, e, latest) {
     const gov = new Set(latest ? (c.gov || []) : []);
     const hasV = e.p.some(p => p[4] != null);
-    const w = winnerOf(e);
     const maj = Math.floor(e.seats / 2) + 1;
     const seatsFact = `<div class="fact"><div class="fact-k">${tr('Seats', 'Sitze')}</div><div class="fact-v">${int(e.seats)} <small>${tr('majority', 'Mehrheit')} ${int(maj)}</small></div></div>`;
-    const parties = e.p.filter(p => p[5] > 0).map(p => ({ id: p[0], short: p[1], color: p[3], seats: p[5] }));
     const rows = e.p.slice().sort((a, b) => hasV ? ((b[4] || -1) - (a[4] || -1)) || (b[5] - a[5]) : b[5] - a[5]);
-    const maxV = Math.max(...e.p.map(p => p[4] || 0));
+    const val = p => hasV ? p[4] : p[5];
+    const maxV = Math.max(...e.p.map(p => val(p) || 0)) || 1;
     const sumV = d3.sum(e.p, p => p[4] || 0);
     // A remainder row (100 − sum) is only derived when the data does not state its own percentage basis (e.pbase)
     const other = hasV && !e.pbase && e.p.every(p => p[4] != null) ? 100 - sumV : null;
-    const trs = rows.map(p => `<tr data-p="${p[0]}" class="${p[5] ? '' : 'dim'}"><td><div class="pn"><i class="sw" style="background:${pc(p[3])}"></i><div><b>${esc(p[1])}</b>${gov.has(p[0]) ? `<span class="gov-tag" title="${tr('in government', 'an der Regierung beteiligt')}">${tr('GOV', 'REG')}</span>` : ''}<small>${esc(p[2])}</small></div></div></td>`
-      + (hasV ? `<td class="num">${p[4] != null ? pct(p[4]) : '–'}${p[4] != null ? `<div class="vbar" style="width:${Math.max(3, 48 * p[4] / maxV)}px;background:${pc(p[3])}"></div>` : ''}</td>` : '')
-      + `<td class="num"><b>${p[5]}</b></td><td class="num">${chg(p[6])}</td></tr>`).join('')
-      + (other != null && other > 0.25 ? `<tr class="dim"><td><div class="pn"><i class="sw" style="background:var(--land)"></i><div><b>${tr('Others', 'Sonstige')}</b></div></div></td><td class="num">${pct(other)}</td><td class="num">0</td><td></td></tr>` : '');
-    const winLabel = hasV ? (e.vl ? tr('Largest party · ', 'Stärkste Kraft · ') + e.vl : tr('Largest party', 'Stärkste Kraft')) : tr('Largest group', 'Größte Fraktion');
-    const winVal = hasV ? pct(w.pct) : w.seats;
-    const winSub = `${w.name}${hasV ? ' · ' + w.seats + tr(' of ', ' von ') + int(e.seats) + tr(' seats', ' Sitzen') : ''}`;
+    // Seat bar: groups in data order (left → right by political orientation), majority line in the middle
+    const seated = e.p.filter(p => p[5] > 0);
+    const govSeats = d3.sum(seated.filter(p => gov.has(p[0])), p => p[5]);
+    const bar = `<div class="seatbar" role="img" aria-label="${tr('Seat distribution', 'Sitzverteilung')}: ${esc(seated.map(p => p[1] + ' ' + p[5]).join(', '))}">${seated.map(p => `<i data-p="${p[0]}" style="flex:${p[5]};background:${pc(p[3])}" title="${esc(p[1])}: ${p[5]}"></i>`).join('')}<span class="maj"></span></div>`;
+    const tag = `<span class="gov-tag" title="${tr('in government', 'an der Regierung beteiligt')}">${tr('GOV', 'REG')}</span>`;
+    // Result rows: a table for screen readers (ARIA roles), a grid with a share bar under each party for the eye
+    const prow = p => `<div class="prow${p[5] ? '' : ' dim'}" role="row" data-p="${p[0]}"><i class="sw" aria-hidden="true" style="background:${pc(p[3])}"></i><span class="pnm" role="cell"><b>${esc(p[1])}</b>${gov.has(p[0]) ? tag : ''}${p[2] && p[2] !== p[1] ? `<small>${esc(p[2])}</small>` : ''}</span>`
+      + (hasV ? `<span class="num" role="cell">${p[4] != null ? pct(p[4]) : '–'}</span>` : '') + `<span class="num" role="cell"><b>${p[5]}</b></span><span class="num" role="cell">${chg(p[6])}</span>`
+      + (val(p) != null ? `<span class="pbar" aria-hidden="true"><i style="width:${(100 * val(p) / maxV).toFixed(1)}%;background:${pc(p[3])}"></i></span>` : '') + '</div>';
+    const others = other != null && other > 0.25 ? `<div class="prow dim" role="row"><i class="sw" aria-hidden="true" style="background:var(--land)"></i><span class="pnm" role="cell"><b>${tr('Others', 'Sonstige')}</b></span><span class="num" role="cell">${pct(other)}</span><span class="num" role="cell">0</span><span role="cell"></span></div>` : '';
+    const head = `<div class="prow ph" role="row"><span aria-hidden="true"></span><span role="columnheader">${tr('Party', 'Partei')}</span>${hasV ? '<span role="columnheader">%</span>' : ''}<span role="columnheader">${tr('Seats', 'Sitze')}</span><span role="columnheader">±</span></div>`;
     return `${statusBadges(e)}
       <section>${factsHTML(e, seatsFact)}</section>
-      <section>${winnerBox(winLabel, w.short, winSub, w.color, winVal)}</section>
-      <section class="sec"><p class="eyebrow">${tr('Seats', 'Sitzverteilung')} · ${esc(e.ch)}</p><figure class="hemi" id="hemi">${hemicycle(parties, e.seats, gov)}</figure>
-        <p class="cap">${tr('Groups arranged from left to right by political orientation.', 'Fraktionen von links nach rechts nach politischer Ausrichtung angeordnet.')}</p></section>
-      <section class="sec"><p class="eyebrow">${tr('Result', 'Ergebnis')}</p><div class="tbl-wrap"><table class="res"><thead><tr><th>${tr('Party', 'Partei')}</th>${hasV ? `<th>${esc(e.vl || tr('Votes', 'Stimmen'))}</th>` : ''}<th>${tr('Seats', 'Sitze')}</th><th>±</th></tr></thead><tbody>${trs}</tbody></table></div>
+      <section class="sec"><div class="sb-h"><p class="eyebrow">${tr('Seats', 'Sitzverteilung')} · ${esc(e.ch)}</p>${govSeats ? `<span>${tr('Government', 'Regierung')} <b class="num">${int(govSeats)}</b> / ${int(e.seats)}</span>` : ''}</div>${bar}
+        <p class="cap">${tr('Majority', 'Mehrheit')} ${int(maj)} · ${tr('groups arranged from left to right by political orientation', 'Fraktionen von links nach rechts nach politischer Ausrichtung')}</p></section>
+      <section class="sec"><p class="eyebrow">${tr('Result', 'Ergebnis')}${hasV ? ' · ' + esc(e.vl || tr('Votes', 'Stimmen')) : ''}</p>
+        <div class="plist${hasV ? '' : ' nov'}" role="table" aria-label="${tr('Result by party', 'Ergebnis nach Parteien')}">${head}${rows.map(prow).join('')}${others}</div>
         ${e.note ? `<p class="note" style="margin-top:10px">${esc(e.note)}</p>` : ''}
         ${e.pbase ? `<p class="note pbase" style="margin-top:10px">${esc(e.pbase)}</p>` : ''}</section>`;
   }
@@ -1085,8 +1074,7 @@
       const rs = shortName(rn), ds = shortName(dn);
       evBlock = `<section class="sec"><p class="eyebrow">${tr('Electoral College', 'Wahlleute (Electoral College)')}</p>
         <div class="evbar"><span style="width:${100 * e.ev.rep / tot}%;background:${pc('#D22532')}">${esc(rs)} ${e.ev.rep}</span><span style="width:${100 * e.ev.dem / tot}%;background:${pc('#2E64B5')};justify-content:flex-end">${e.ev.dem} ${esc(ds)}</span><i class="evmid"></i></div>
-        <p class="cap">${tr('270 of 538 votes needed to win', '270 von 538 Stimmen nötig')}</p>
-        <figure class="hemi" id="hemi" style="margin-top:10px">${hemicycle([{ id: 'dem', short: ds, color: '#2E64B5', seats: e.ev.dem }, { id: 'rep', short: rs, color: '#D22532', seats: e.ev.rep }], tot, null, { unit: tr('electors', 'Wahlleute'), majority: 270 })}</figure></section>`;
+        <p class="cap">${tr('270 of 538 votes needed to win', '270 von 538 Stimmen nötig')}</p></section>`;
     }
     const list = sorted.map(x => {
       const fin = r2 ? x[5] : x[4];
@@ -1229,7 +1217,6 @@
     if (mEl) { S.metric = mEl.dataset.metric; rerender(); return; }
     const t = ev.target.closest('button, input'); if (!t) return;
     if (t.dataset.open) { openCountry(t.dataset.open); return; }
-    if (t.id === 'ov-clear' || t.dataset.sqClear != null) { clearSearch(true); return; }
     if (t.id === 'close') { closeCountry(); return; }
     if (t.id === 'rclose') { clearRegion(); return; }
     if (t.dataset.tab) { S.tab = t.dataset.tab; rerender(); return; }
@@ -1237,11 +1224,10 @@
     if (t.dataset.layer) { setLayer(t.dataset.layer); return; }
     if (t.id === 'shade') { S.shade = t.checked; try { localStorage.setItem('wahlatlas-shade', S.shade ? '1' : '0'); } catch (e) { /* ignore */ } recolorDetail(); renderLegend(); }
   });
-  // highlight a party in the hemicycle when its table row or seat is hovered
+  // highlight a party in the seat bar and the result rows when either is hovered
   function hl(id) {
-    const fig = panel.querySelector('#hemi'); if (!fig) return;
-    fig.querySelectorAll('circle').forEach(cl => { cl.style.opacity = !id || cl.dataset.p === id ? '' : '0.18'; });
-    panel.querySelectorAll('tr[data-p]').forEach(r => r.classList.toggle('hl', !!id && r.dataset.p === id));
+    panel.querySelectorAll('.seatbar i').forEach(x => { x.style.opacity = !id || x.dataset.p === id ? '' : '0.25'; });
+    panel.querySelectorAll('.prow[data-p]').forEach(r => r.classList.toggle('hl', !!id && r.dataset.p === id));
   }
   // highlight a line in the trend chart
   function hlSeries(id) {
@@ -1253,17 +1239,7 @@
     const s = ev.target.closest('[data-s]'); hlSeries(s ? s.dataset.s : null);
   });
   panel.addEventListener('mouseleave', () => { hl(null); hlSeries(null); });
-  panel.addEventListener('input', ev => { if (ev.target.id === 'ov-q') { S.q = ev.target.value; updateSearch(true); } });
   panel.addEventListener('keydown', ev => {
-    const tg = ev.target, hits = () => [...panel.querySelectorAll('#ov-results .row')];
-    if (tg.id === 'ov-q') {                                    // Esc clears, ↓ jumps to the hits, Enter opens a single hit
-      if (ev.key === 'Escape' && S.q) { ev.preventDefault(); clearSearch(true); }
-      else if (ev.key === 'ArrowDown' || ev.key === 'Enter') { const r = hits(); if (r.length) { ev.preventDefault(); if (ev.key === 'Enter' && r.length === 1) r[0].click(); else r[0].focus(); } }
-    } else if (tg.classList && tg.classList.contains('row') && tg.closest('#ov-results')) {
-      const r = hits(), i = r.indexOf(tg);
-      if (ev.key === 'ArrowDown' && i < r.length - 1) { ev.preventDefault(); r[i + 1].focus(); }
-      else if (ev.key === 'ArrowUp') { ev.preventDefault(); (i > 0 ? r[i - 1] : document.getElementById('ov-q')).focus(); }
-    }
     if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('[data-yr][role="button"]')) { ev.preventDefault(); ev.target.dispatchEvent(new MouseEvent('click', { bubbles: true })); }
   });
 
