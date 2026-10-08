@@ -22,7 +22,7 @@ npx serve .
 - `index.html`: Seite und Styles
 - `app.js`: Kartenlogik (D3 v7 + TopoJSON), UI-Texte als `tr('English', 'Deutsch')`
 - `data/elections.js` / `data/elections.de.js`: aktuelle Ergebnisse (EN / DE)
-- `data/history.js` / `data/history.de.js`: frühere Wahlen (EN / DE)
+- `data/hist/XXX.js`: frühere Wahlen je Land (EN und DE), werden beim Öffnen des Landes nachgeladen
 - `data/world.js`: Weltkarte; `data/c-*.js`: Regionalkarten und -ergebnisse
 
 ## Quellen
