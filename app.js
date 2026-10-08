@@ -82,6 +82,13 @@
   }
 
   /* ---------------- History (earlier elections) ---------------- */
+  // Earlier elections live in one small file per country (data/hist/XXX.js, both languages), loaded when the country is opened
+  const histTried = {};
+  async function ensureHist(code) {
+    if ((window.WAHL_HIST && window.WAHL_HIST[code]) || histTried[code]) return;
+    histTried[code] = true;
+    try { await loadScript('data/hist/' + code + '.js'); } catch (e) { console.error(e); }
+  }
   const hist = () => (LANG === 'de' && window.WAHL_HIST_DE) || window.WAHL_HIST || {};
   // List [current election, earlier elections …] for the selected tab, newest first
   function bodyList(c, e) {
@@ -164,7 +171,7 @@
   function modeColor(c) { return S.mode === 'gov' ? govParty(c).color : winnerOf(mainEl(c)).color; }
 
   /* ---------------- State ---------------- */
-  const S = { q: '', lgOpen: false, mode: 'win', preset: 'welt', country: null, el: 0, yr: 0, metric: 'votes', layer: null, region: null, shade: true };
+  const S = { q: '', lgOpen: false, mode: 'win', preset: 'welt', country: null, el: 0, yr: 0, tab: 'result', metric: 'votes', layer: null, region: null, shade: true };
   try { const m = localStorage.getItem('wahlatlas-mode'); if (m === 'gov' || m === 'win') S.mode = m; const sh = localStorage.getItem('wahlatlas-shade'); if (sh === '0') S.shade = false; } catch (e) { /* no storage */ }
 
   /* ---------------- DOM ---------------- */
@@ -484,10 +491,11 @@
     const token = ++navToken;
     const wasDetail = mapEl.classList.contains('is-detail');
     hideTip();
-    S.country = code; S.el = c.main || 0; S.yr = 0; S.region = null;
+    S.country = code; S.el = c.main || 0; S.yr = 0; S.tab = 'result'; S.region = null;
     S.layer = c.sub && SUBDEF[c.sub] ? SUBDEF[c.sub].layers[0].id : null;
     setHash(code);
     renderPanel(); renderLegend(); renderCrumb();
+    ensureHist(code).then(() => { if (S.country === code) rerender(); });
     if (window.innerWidth <= 860 && !(opts && opts.keepScroll)) mapEl.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
     if (wasDetail) { mapEl.classList.remove('is-detail'); await wait(reduceMotion ? 0 : 200); }
     if (token !== navToken) return;
@@ -825,6 +833,8 @@
   function renderPanel() {
     if (!S.country) { panel.innerHTML = overviewHTML(); updateSearch(false); return; }
     panel.innerHTML = countryHTML(C[S.country]);
+    const yr = panel.querySelector('.yr[aria-pressed="true"]');
+    if (yr) yr.parentElement.scrollLeft = yr.offsetLeft - (yr.parentElement.clientWidth - yr.offsetWidth) / 2;
   }
 
   /* ---------------- Country search (overview) ---------------- */
@@ -989,15 +999,24 @@
   function countryHTML(c) {
     const els = c.el;
     const e = els[S.el] || els[0];
-    const tabs = els.length > 1 ? `<div class="tabs" role="group" aria-label="${tr('Choose election', 'Wahl auswählen')}">${els.map((x, i) => `<button type="button" class="tab" data-el="${i}" aria-pressed="${i === S.el}">${esc(x.t)}</button>`).join('')}</div>` : '';
+    const elTabs = els.length > 1 ? `<div class="tabs" role="group" aria-label="${tr('Choose election', 'Wahl auswählen')}">${els.map((x, i) => `<button type="button" class="tab" data-el="${i}" aria-pressed="${i === S.el}">${esc(x.t)}</button>`).join('')}</div>` : '';
     const region = S.region ? regionCardHTML(c) : '';
     const list = bodyList(c, e);
     if (S.yr >= list.length) S.yr = 0;
     const cur = list[S.yr], latest = S.yr === 0;
+    // Timeline: one chip per election, scrolls sideways, so any number of elections fits; the stripe shows the winner
     const years = list.length > 1
-      ? `<section class="yrs"><div class="years" role="group" aria-label="${tr('Choose election year', 'Wahljahr auswählen')}">${list.map((x, i) => `<button type="button" class="yr" data-yr="${i}" aria-pressed="${i === S.yr}">${esc(yearLbl(list, i))}</button>`).join('')}</div>${latest ? '' : `<p class="cur-t">${esc(cur.t)} <span>· ${tr('earlier election', 'frühere Wahl')}</span></p>`}</section>` : '';
-    const body = cur.k === 'pres' ? presHTML(c, cur) : parlHTML(c, cur, latest);
-    const trend = list.length > 1 ? (cur.k === 'pres' ? presTrendHTML(c, list) : parlTrendHTML(c, list)) : '';
+      ? `<section class="yrs"><div class="years" role="group" aria-label="${tr('Choose election year', 'Wahljahr auswählen')}">${list.map((x, i) => `<button type="button" class="yr" data-yr="${i}" aria-pressed="${i === S.yr}"><i class="ys" style="background:${pc(winnerOf(x).color)}"></i>${esc(yearLbl(list, i))}</button>`).join('')}</div>${latest ? '' : `<p class="cur-t">${esc(cur.t)} <span>· ${tr('earlier election', 'frühere Wahl')}</span></p>`}</section>` : '';
+    const hasMap = !!(c.sub && SUBDEF[c.sub]);
+    const tabs = [['result', tr('Result', 'Ergebnis')], list.length > 1 && ['trend', tr('Trend', 'Verlauf')], ['gov', tr('Government', 'Regierung')], hasMap && ['map', tr('Map', 'Karte')], ['src', tr('Sources', 'Quellen')]].filter(Boolean);
+    if (!tabs.some(t => t[0] === S.tab)) S.tab = 'result';
+    const pane = {
+      result: () => cur.k === 'pres' ? presHTML(c, cur) : parlHTML(c, cur, latest),
+      trend: () => cur.k === 'pres' ? presTrendHTML(c, list) : parlTrendHTML(c, list),
+      gov: () => govHTML(c, latest) + `<section class="sec"><p class="eyebrow">${tr('Next election', 'Nächster Termin')}</p><p class="note"><b style="color:var(--ink)">${esc(c.next)}</b></p></section>`,
+      map: () => layersHTML(c),
+      src: () => sourcesSectionHTML(cur)
+    }[S.tab]();
     return `<div class="pi">
       ${region}
       <section class="sec">
@@ -1006,14 +1025,10 @@
           <button type="button" class="x" id="close" aria-label="${tr('Back to world map', 'Zurück zur Weltkarte')}">×</button>
         </div>
       </section>
-      ${tabs ? `<section>${tabs}</section>` : ''}
+      ${elTabs ? `<section>${elTabs}</section>` : ''}
       ${years}
-      ${body}
-      ${sourcesSectionHTML(cur)}
-      ${trend}
-      ${govHTML(c, latest)}
-      ${layersHTML(c)}
-      <section class="sec"><p class="eyebrow">${tr('Next election', 'Nächster Termin')}</p><p class="note"><b style="color:var(--ink)">${esc(c.next)}</b></p></section>
+      <nav class="ptabs" aria-label="${tr('Sections', 'Bereiche')}">${tabs.map(t => `<button type="button" class="ptab" data-tab="${t[0]}" aria-pressed="${t[0] === S.tab}">${esc(t[1])}</button>`).join('')}</nav>
+      ${pane}
       <section class="sec">${sourcesHTML()}</section>
     </div>`;
   }
@@ -1217,6 +1232,7 @@
     if (t.id === 'ov-clear' || t.dataset.sqClear != null) { clearSearch(true); return; }
     if (t.id === 'close') { closeCountry(); return; }
     if (t.id === 'rclose') { clearRegion(); return; }
+    if (t.dataset.tab) { S.tab = t.dataset.tab; rerender(); return; }
     if (t.dataset.el != null) { S.el = +t.dataset.el; S.yr = 0; renderPanel(); syncMapYear(); return; }
     if (t.dataset.layer) { setLayer(t.dataset.layer); return; }
     if (t.id === 'shade') { S.shade = t.checked; try { localStorage.setItem('wahlatlas-shade', S.shade ? '1' : '0'); } catch (e) { /* ignore */ } recolorDetail(); renderLegend(); }

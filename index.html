@@ -257,10 +257,16 @@ table.res { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 /* ---------- earlier elections & trend ---------- */
 .yrs { display: grid; gap: 8px; }
-.years { display: flex; flex-wrap: wrap; gap: 6px; }
-.yr { border: 1px solid var(--rule); background: transparent; padding: 5px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 650; cursor: pointer; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.years { position: relative; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; margin: 0 -22px; padding: 2px 22px 8px; }
+.ptabs { display: flex; gap: 2px; border-bottom: 1px solid var(--rule); margin: -6px -22px 0; padding: 0 14px; overflow-x: auto; scrollbar-width: none; }
+.ptab { flex: none; border: 0; background: transparent; padding: 10px 11px 9px; font-size: 13px; font-weight: 650; color: var(--ink-2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.ptab:hover { color: var(--ink); }
+.ptab[aria-pressed="true"] { color: var(--ink); border-bottom-color: var(--focus); }
+.ptabs + .sec { border-top: 0; padding-top: 0; }
+.ys { display: block; height: 4px; border-radius: 2px; margin-bottom: 5px; }
+.yr { flex: none; border: 1px solid var(--rule); background: transparent; padding: 7px 11px 6px; border-radius: 9px; font-size: 12.5px; font-weight: 650; cursor: pointer; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .yr:hover { border-color: var(--ink-3); color: var(--ink); }
-.yr[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.yr[aria-pressed="true"] { background: var(--chip); color: var(--ink); border-color: var(--focus); }
 .cur-t { margin: 0; font-size: 13px; font-weight: 700; }
 .cur-t span { color: var(--ink-3); font-weight: 500; }
 .trend-h { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -330,6 +336,8 @@ label.eyebrow { display: block; }
   .legend { grid-row: 2; align-self: stretch; justify-self: stretch; margin: 0; max-width: none; border-radius: 0; border-width: 1px 0 0; box-shadow: none; backdrop-filter: none; background: var(--sheet); padding: 10px 16px 10px; font-size: 12.5px; }
   .panel { grid-column: 1; grid-row: 3; border-left: 0; border-top: 1px solid var(--rule); overflow: visible; }
   .pi { padding: 18px 16px 28px; }
+  .years { margin: 0 -16px; padding: 2px 16px 8px; }
+  .ptabs { margin: -6px -16px 0; padding: 0 6px; }
   .lg-flag { display: flex; margin-top: 4px; }
   .lg-toggle { display: inline-flex; }
   .lg-body { display: none; margin-top: 8px; }
@@ -406,9 +414,7 @@ label.eyebrow { display: block; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
 <script src="data/elections.js"></script>
-<script src="data/history.js"></script>
 <script src="data/elections.de.js"></script>
-<script src="data/history.de.js"></script>
 <script src="data/world.js"></script>
 <script src="app.js"></script>
 <!--ARTIFACT-END-->
