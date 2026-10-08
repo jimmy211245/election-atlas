@@ -381,19 +381,18 @@
     const r = mapEl.getBoundingClientRect(); const w = Math.max(200, r.width), h = Math.max(200, r.height);
     WV.w = w; WV.h = h;
     worldSvg.attr('viewBox', [0, 0, w, h]);
-    WV.proj.fitExtent([[10, 10], [w - 10, h - 10]], { type: 'FeatureCollection', features: WV.feats });
+    WV.proj.fitExtent([[10, 10], [w - 10, h - 10]], { type: 'Sphere' });
     WV.ocean.attr('d', WV.path({ type: 'Sphere' }));
     WV.grat.attr('d', WV.path(d3.geoGraticule10()));
     WV.paths.attr('d', WV.path);
-    WV.zoom.extent([[0, 0], [w, h]]).translateExtent([[0, 0], [w, h]]);
-    // Portrait (phone): fill the height instead of squeezing the world into the width, Europe centred
-    const b = WV.path.bounds({ type: 'FeatureCollection', features: WV.feats });
-    const worldH = b[1][1] - b[0][1];
+    // Portrait: the globe always fills the height (no empty bands), pan sideways; Europe centred at start
+    const sb = WV.path.bounds({ type: 'Sphere' });
+    WV.kMin = h > w ? h / (sb[1][1] - sb[0][1]) : 1;
+    WV.zoom.extent([[0, 0], [w, h]]).translateExtent(sb).scaleExtent([WV.kMin, 16 * WV.kMin]);
     WV.base = d3.zoomIdentity;
-    if (h / w > 1) {
-      const k = Math.min(2.1, (h * 0.84) / worldH);
-      const [fx, fy] = WV.proj([-22, 30]);
-      WV.base = d3.zoomIdentity.translate(w / 2 - k * fx, h / 2 - k * fy).scale(k);
+    if (WV.kMin > 1) {
+      const k = WV.kMin, fx = WV.proj([-22, 30])[0];
+      WV.base = d3.zoomIdentity.translate(w / 2 - k * fx, h / 2 - k * h / 2).scale(k);
     }
     WV.mk.selectAll('circle').data(TINY.map(id => WV.byIso.get(id)).filter(Boolean)).join('circle')
       .attr('cx', d => WV.path.centroid(d)[0]).attr('cy', d => WV.path.centroid(d)[1])
@@ -448,8 +447,10 @@
     const pts = P.map(p => proj(p)).filter(Boolean);
     const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
     const bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys);
-    const k = Math.max(1, Math.min(maxK || 16, fill / Math.max((bx1 - bx0) / w, (by1 - by0) / h)));
-    return d3.zoomIdentity.translate(w / 2 - k * (bx0 + bx1) / 2, h / 2 - k * (by0 + by1) / 2).scale(k);
+    const k = Math.max(proj === WV.proj ? WV.kMin : 1, Math.min(maxK || 16, fill / Math.max((bx1 - bx0) / w, (by1 - by0) / h)));
+    const t = d3.zoomIdentity.translate(w / 2 - k * (bx0 + bx1) / 2, h / 2 - k * (by0 + by1) / 2).scale(k);
+    // zoom.transform does not clamp, so keep world presets inside the globe (no empty bands)
+    return proj === WV.proj ? WV.zoom.constrain()(t, [[0, 0], [w, h]], WV.zoom.translateExtent()) : t;
   }
   function zoomWorld(t, ms) {
     const tr = worldSvg.transition().duration(ms == null ? DUR : ms).call(WV.zoom.transform, t);
